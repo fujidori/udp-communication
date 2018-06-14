@@ -3,11 +3,6 @@
 int
 main(int argc, char *argv[])
 {
-	extern char *optarg;
-	extern int optind;
-	int c, err = 0;
-	static char usage[] = "usage: %s [-a serveraddr] [-p port]\n";
-
 	struct sockaddr_in servaddr;
 	socklen_t servaddr_len  = sizeof(servaddr);
 	int fd;
@@ -15,14 +10,32 @@ main(int argc, char *argv[])
 	int port = SERVICE_PORT;
 	char buf[BUFSIZE] = "This packet is from client";
 
+	int option_index = 0;
+	int c, err = 0;
+	static struct option long_options[] = {
+		{"address", required_argument, 0, 'a'},
+		{"port",    required_argument, 0, 'p'},
+		{"help",    no_argument,       0, 'h'},
+		{0, 0, 0, 0}
+	};
+	static char usage[] = "usage: %s [-a serveraddr] [-p port]\n";
+
 
 	/* parse the command-line arguments */
 
-	while ((c = getopt(argc, argv, "a:p:")) != -1)
+	while ((c = getopt_long(argc, argv, "a:p:h", long_options, &option_index)) != -1) {
 		switch (c) {
+		case 0:	/* if flag(option's 3rd value) exits */
+			printf("option %s", long_options[option_index].name);
+			if (optarg)
+				printf(" with arg %s has flag", optarg);
+			printf("\n");
+			break;
+
 		case 'a':	/* server address */
 			server = optarg;
 			break;
+	
 		case 'p':	/* port number */
 			port = atoi(optarg);
 			if (port < 1024 || port > 65535) {
@@ -30,10 +43,16 @@ main(int argc, char *argv[])
 				err = 1;
 			}
 			break;
+
+		case 'h':	/* help */
+			printf(usage, argv[0]);
+			exit(EXIT_SUCCESS);
+
 		default:	/* '?' */
 			err = 1;
 			break;
 		}
+	}
 	if (err || (optind < argc)) {	/* error or extra arguments? */
 		fprintf(stderr, usage, argv[0]);
 		exit(EXIT_FAILURE);

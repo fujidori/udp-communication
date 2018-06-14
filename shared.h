@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>	/* for EXIT_FAILURE */
 #include <string.h>	/* for strlen(), menset() */
+#include <getopt.h>	/* for getopt_long() */
 #include <netdb.h>	/* for gethostbyname() */ /* now not used */
 #include <unistd.h>	/* for close() */
 #include <sys/socket.h>	/* for inet_ntoa() */
