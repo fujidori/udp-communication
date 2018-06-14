@@ -1,14 +1,43 @@
 #include "shared.h"
 
 int
-main(int argc, char const* argv[])
+main(int argc, char *argv[])
 {
+	extern char *optarg;
+	extern int optind;
+	int c, err = 0;
+	static char usage[] = "usage: %s [-a serveraddr] [-p port]\n";
+
 	struct sockaddr_in servaddr;
 	socklen_t servaddr_len  = sizeof(servaddr);
 	int fd;
 	char *server = SERVICE_ADDR;
-	uint16_t port = SERVICE_PORT;
+	int port = SERVICE_PORT;
 	char buf[BUFSIZE] = "This packet is from client";
+
+
+	/* parse the command-line arguments */
+
+	while ((c = getopt(argc, argv, "a:p:")) != -1)
+		switch (c) {
+		case 'a':	/* server address */
+			server = optarg;
+			break;
+		case 'p':	/* port number */
+			port = atoi(optarg);
+			if (port < 1024 || port > 65535) {
+				fprintf(stderr, "invalid port number: %s\n", optarg);
+				err = 1;
+			}
+			break;
+		default:	/* '?' */
+			err = 1;
+			break;
+		}
+	if (err || (optind < argc)) {	/* error or extra arguments? */
+		fprintf(stderr, usage, argv[0]);
+		exit(EXIT_FAILURE);
+	}
 
 	/* create a UDP socket */
 
