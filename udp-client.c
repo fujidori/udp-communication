@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>	/* for EXIT_FAILURE */
-#include <string.h>	/* for strlen(), menset() */
+#include <string.h>	/* for strlen(), memset() */
 #include <getopt.h>	/* for getopt_long() */
 #include <unistd.h>	/* for close() */
 #include <sys/socket.h>	/* for socket() */
