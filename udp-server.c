@@ -1,8 +1,15 @@
+#include <stdio.h>
+#include <stdlib.h>	/* for EXIT_FAILURE */
+#include <string.h>	/* for strlen(), menset() */
+#include <getopt.h>	/* for getopt_long() */
+#include <unistd.h>	/* for close() */
+#include <sys/socket.h>	/* for socket(), bind() */
+#include <arpa/inet.h>	/* for sockaddr_in , inet_ntoa() */
 #include "shared.h"
 
 void receive_msg(int port);
 
-void
+int
 main(int argc, char *argv[])
 {
 	int port = SERVICE_PORT;
@@ -60,12 +67,13 @@ receive_msg(int port)
 	socklen_t cliaddr_len = sizeof(cliaddr);
 	int fd;
 	char buf[BUFSIZE];	/* receive buffer */
-	int recvlen;		/* # bytes received */
+	ssize_t recvlen;		/* # bytes received */
 
 
 	/* create a UDP socket */
 
-	if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (fd == -1) {
 		perror("cannot create socket\n");
 		exit(EXIT_FAILURE);
 	}
@@ -77,7 +85,7 @@ receive_msg(int port)
 	myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	myaddr.sin_port = htons(port);
 
-	if (bind(fd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) {
+	if (bind(fd, (struct sockaddr *)&myaddr, sizeof(myaddr)) == -1) {
 		perror("bind failed");
 		exit(EXIT_FAILURE);
 	}
@@ -86,7 +94,7 @@ receive_msg(int port)
 	for (;;) {
 		printf("waiting on port %d\n", port);
 		recvlen = recvfrom(fd, buf, BUFSIZE, 0, (struct sockaddr *)&cliaddr, &cliaddr_len);
-		printf("received %d bytes\n", recvlen);
+		printf("received %zd bytes\n", recvlen);
 		if (recvlen > 0) {
 			buf[recvlen] = '\0';
 			printf("received message: \"%s\"\n", buf);

@@ -1,3 +1,10 @@
+#include <stdio.h>
+#include <stdlib.h>	/* for EXIT_FAILURE */
+#include <string.h>	/* for strlen(), menset() */
+#include <getopt.h>	/* for getopt_long() */
+#include <unistd.h>	/* for close() */
+#include <sys/socket.h>	/* for socket() */
+#include <arpa/inet.h>	/* for sockaddr_in, inet_ntoa() */
 #include "shared.h"
 
 int send_msg(char *server, int port);
@@ -71,7 +78,8 @@ send_msg(char *server, int port)
 
 	/* create a UDP socket */
 
-	if ( (fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+	fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (fd == -1) {
 		perror("socket creation failed");
 		return 1;
 	}

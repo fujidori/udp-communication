@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS = -g
+CFLAGS = -O2 -W -Wall -Wextra -Werror -Wconversion -Wmissing-prototypes -Wmissing-declarations
 
 .PHONY: all
 all: udp-server udp-client
