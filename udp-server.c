@@ -1,16 +1,11 @@
 #include "shared.h"
 
+void receive_msg(int port);
+
 void
 main(int argc, char *argv[])
 {
-	struct sockaddr_in myaddr;
-	struct sockaddr_in cliaddr;
-	socklen_t cliaddr_len = sizeof(cliaddr);
-	int fd;
 	int port = SERVICE_PORT;
-	char buf[BUFSIZE];	/* receive buffer */
-	int recvlen;		/* # bytes received */
-
 	int option_index = 0;
 	int c, err = 0;
 	static struct option long_options[] = {
@@ -53,6 +48,20 @@ main(int argc, char *argv[])
 		fprintf(stderr, usage, argv[0]);
 		exit(EXIT_FAILURE);
 	}
+
+	receive_msg(port);	/* never exits */
+}
+
+void
+receive_msg(int port)
+{
+	struct sockaddr_in myaddr;
+	struct sockaddr_in cliaddr;
+	socklen_t cliaddr_len = sizeof(cliaddr);
+	int fd;
+	char buf[BUFSIZE];	/* receive buffer */
+	int recvlen;		/* # bytes received */
+
 
 	/* create a UDP socket */
 

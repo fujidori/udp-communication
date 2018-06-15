@@ -1,15 +1,12 @@
 #include "shared.h"
 
+int send_msg(char *server, int port);
+
 int
 main(int argc, char *argv[])
 {
-	struct sockaddr_in servaddr;
-	socklen_t servaddr_len  = sizeof(servaddr);
-	int fd;
 	char *server = SERVICE_ADDR;
 	int port = SERVICE_PORT;
-	char buf[BUFSIZE] = "This packet is from client";
-
 	int option_index = 0;
 	int c, err = 0;
 	static struct option long_options[] = {
@@ -58,11 +55,25 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	if (send_msg(server, port))
+		exit(EXIT_FAILURE);
+	return 0;
+}
+
+int
+send_msg(char *server, int port)
+{
+	struct sockaddr_in servaddr;
+	socklen_t servaddr_len  = sizeof(servaddr);
+	int fd;
+	char buf[BUFSIZE] = "This packet is from client";
+
+
 	/* create a UDP socket */
 
 	if ( (fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
 		perror("socket creation failed");
-		exit(EXIT_FAILURE);
+		return 1;
 	}
 
     /* Filling server information */
@@ -72,14 +83,16 @@ main(int argc, char *argv[])
 	servaddr.sin_port = htons(port);
 	if (inet_aton(server, &servaddr.sin_addr) == 0) {
 		fprintf(stderr, "inet_aton() failed\n");
-		exit(EXIT_FAILURE);
+		return 1;
 	}
 
 	/* send the messages */
 
 	printf("Sending packet to %s port %d\n", server, port);
-	if (sendto(fd, buf, strlen(buf), 0, (struct sockaddr *)&servaddr, servaddr_len) == -1)
+	if (sendto(fd, buf, strlen(buf), 0, (struct sockaddr *)&servaddr, servaddr_len) == -1) {
 		perror("sendto");
+		return 1;
+	}
 
 	close(fd);
 	return 0;
