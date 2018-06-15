@@ -84,7 +84,7 @@ send_msg(char *server, int port)
 		return 1;
 	}
 
-    /* Filling server information */
+	/* Filling server information */
 
 	memset((char *) &servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
