@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>	/* for EXIT_FAILURE */
-#include <string.h>	/* for strlen(), menset() */
+#include <string.h>	/* for strlen(), memset() */
 #include <getopt.h>	/* for getopt_long() */
 #include <unistd.h>	/* for close() */
 #include <sys/socket.h>	/* for socket() */
@@ -84,7 +84,7 @@ send_msg(char *server, int port)
 		return 1;
 	}
 
-    /* Filling server information */
+	/* Filling server information */
 
 	memset((char *) &servaddr, 0, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
