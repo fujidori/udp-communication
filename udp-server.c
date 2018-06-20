@@ -1,23 +1,25 @@
+#include <sys/socket.h>	/* for socket(), bind() */
+#include <sys/types.h>
+#include <arpa/inet.h>	/* for sockaddr_in , inet_ntoa() */
+#include <netdb.h>	/* for addrinfo */
 #include <stdio.h>
 #include <stdlib.h>	/* for EXIT_FAILURE */
 #include <string.h>	/* for strlen(), menset() */
 #include <getopt.h>	/* for getopt_long() */
 #include <unistd.h>	/* for close() */
-#include <sys/socket.h>	/* for socket(), bind() */
-#include <arpa/inet.h>	/* for sockaddr_in , inet_ntoa() */
 #include "shared.h"
 
-void receive_msg(int port);
+void receive_msg(char *port);
 
 int
 main(int argc, char *argv[])
 {
-	int port = SERVICE_PORT;
+	char *port = SERVICE_PORT;
 	int option_index = 0;
 	int c, err = 0;
 	static struct option long_options[] = {
-		{"port",    required_argument, 0, 'p'},
-		{"help",    no_argument,       0, 'h'},
+		{"port", required_argument, 0, 'p'},
+		{"help", no_argument,       0,  0 },
 		{0, 0, 0, 0}
 	};
 	static char usage[] = "usage: %s [-p port]\n";
@@ -27,26 +29,20 @@ main(int argc, char *argv[])
 
 	while ((c = getopt_long(argc, argv, "p:h", long_options, &option_index)) != -1) {
 		switch (c) {
-		case 0:	/* if flag(option's 3rd value) exits */
-			printf("option %s", long_options[option_index].name);
-			if (optarg)
-				printf(" with arg %s has flag", optarg);
-			printf("\n");
-			break;
+		case 0:	/* help */
+			printf(usage, argv[0]);
+			exit(EXIT_SUCCESS);
 
 		case 'p':	/* port number */
-			port = atoi(optarg);
-			if (port < 1024 || port > 65535) {
+			port = optarg;
+			if (atoi(port) < 1024 || atoi(port) > 65535) {
 				fprintf(stderr, "invalid port number: %s\n", optarg);
 				err = 1;
 			}
 			break;
 
-		case 'h':	/* help */
-			printf(usage, argv[0]);
-			exit(EXIT_SUCCESS);
-
-		default:	/* '?' */
+		case '?':
+		default:
 			err = 1;
 			break;
 		}
@@ -56,49 +52,83 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	receive_msg(port);	/* never exits */
+	receive_msg(port);
+	/* NOTREACHED */
 }
 
 void
-receive_msg(int port)
+receive_msg(char *port)
 {
-	struct sockaddr_in myaddr;
-	struct sockaddr_in cliaddr;
-	socklen_t cliaddr_len = sizeof(cliaddr);
-	int fd;
+	struct addrinfo hints;
+	struct addrinfo *res, *rp;
+	int sfd, s;
+	struct sockaddr_storage peer_addr;
+	socklen_t peer_addr_len;
 	char buf[BUFSIZE];	/* receive buffer */
-	ssize_t recvlen;		/* # bytes received */
+	ssize_t recvlen;		/* bytes received */
 
 
-	/* create a UDP socket */
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_protocol = 0;
+	hints.ai_canonname = NULL;
+	hints.ai_addr = NULL;
+	hints.ai_next = NULL;
 
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (fd == -1) {
-		perror("cannot create socket\n");
+	s = getaddrinfo(NULL, port, &hints, &res);
+	if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
 		exit(EXIT_FAILURE);
 	}
 
-	/* bind the socket to any valid IP address and a specific port */
+	/*
+	 * Try each address until we successfully bind().
+	 * If socket() (or bind()) fails, we (close the socket
+	 * and) try the next address.
+	 */
 
-	memset((char *)&myaddr, 0, sizeof(myaddr));
-	myaddr.sin_family = AF_INET;
-	myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	myaddr.sin_port = htons(port);
+	for (rp = res; rp != NULL; rp = rp->ai_next) {
+		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if (sfd == -1)
+			continue;
 
-	if (bind(fd, (struct sockaddr *)&myaddr, sizeof(myaddr)) == -1) {
-		perror("bind failed");
+		if (bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+			break;					/* Success */
+
+		close(sfd);
+	}
+
+	if (rp == NULL) {				/* No address succeeded */
+		fprintf(stderr, "Could not bind\n");
 		exit(EXIT_FAILURE);
 	}
+
+	freeaddrinfo(res);				/* No longer needed */
+
 
 	/* now loop, receiving data and printing what we received */
+
 	for (;;) {
-		printf("waiting on port %d\n", port);
-		recvlen = recvfrom(fd, buf, BUFSIZE, 0, (struct sockaddr *)&cliaddr, &cliaddr_len);
-		printf("received %zd bytes\n", recvlen);
-		if (recvlen > 0) {
-			buf[recvlen] = '\0';
-			printf("received message: \"%s\"\n", buf);
-		}
+		peer_addr_len = sizeof(struct sockaddr_storage);
+		recvlen = recvfrom(sfd, buf, BUFSIZE, 0,
+				(struct sockaddr *) &peer_addr, &peer_addr_len);
+		if (recvlen == -1)
+			continue;				/* Ignore failed request */
+		buf[recvlen] = '\0';
+
+		char host[NI_MAXHOST], service[NI_MAXSERV];
+
+		s = getnameinfo((struct sockaddr *) &peer_addr, peer_addr_len,
+						host, NI_MAXHOST, service, NI_MAXSERV, 
+						NI_NUMERICHOST | NI_NUMERICSERV);
+		if (s == 0) {
+			printf("Received %zd bytes from %s:%s\n", recvlen, host, service);
+		} else
+			fprintf(stderr, "getnameinfo: %s\n", gai_strerror(s));
 	}
-	/* never exits */
+
+	/* NOTREACHED */
+	close(sfd);
 }

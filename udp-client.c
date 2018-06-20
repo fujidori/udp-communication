@@ -1,58 +1,55 @@
+#include <sys/socket.h>	/* for socket() */
+#include <sys/types.h>
+#include <arpa/inet.h>	/* for sockaddr_in, inet_ntoa() */
+#include <netdb.h>	/* for addrinfo */
 #include <stdio.h>
 #include <stdlib.h>	/* for EXIT_FAILURE */
 #include <string.h>	/* for strlen(), memset() */
 #include <getopt.h>	/* for getopt_long() */
 #include <unistd.h>	/* for close() */
-#include <sys/socket.h>	/* for socket() */
-#include <arpa/inet.h>	/* for sockaddr_in, inet_ntoa() */
 #include "shared.h"
 
-int send_msg(char *server, int port);
+int send_msg(char *server, char *port);
 
 int
 main(int argc, char *argv[])
 {
 	char *server = SERVICE_ADDR;
-	int port = SERVICE_PORT;
+	char *port = SERVICE_PORT;
 	int option_index = 0;
 	int c, err = 0;
 	static struct option long_options[] = {
-		{"address", required_argument, 0, 'a'},
-		{"port",    required_argument, 0, 'p'},
-		{"help",    no_argument,       0, 'h'},
+		{"port", required_argument, 0, 'p'},
+		{"host", required_argument, 0, 'h'},
+		{"help", no_argument,       0,  0 },
 		{0, 0, 0, 0}
 	};
-	static char usage[] = "usage: %s [-a serveraddr] [-p port]\n";
+	static char usage[] = "usage: %s [-h host] [-p port]\n";
 
 
 	/* parse the command-line arguments */
 
-	while ((c = getopt_long(argc, argv, "a:p:h", long_options, &option_index)) != -1) {
+	while ((c = getopt_long(argc, argv, "h:p:", long_options,
+			&option_index)) != -1) {
 		switch (c) {
-		case 0:	/* if flag(option's 3rd value) exits */
-			printf("option %s", long_options[option_index].name);
-			if (optarg)
-				printf(" with arg %s has flag", optarg);
-			printf("\n");
-			break;
+		case 0:	/* help */
+			printf(usage, argv[0]);
+			exit(EXIT_SUCCESS);
 
-		case 'a':	/* server address */
+		case 'h':	/* host */
 			server = optarg;
 			break;
 	
 		case 'p':	/* port number */
-			port = atoi(optarg);
-			if (port < 1024 || port > 65535) {
+			port = optarg;
+			if (atoi(port) < 1024 || atoi(port) > 65535) {
 				fprintf(stderr, "invalid port number: %s\n", optarg);
 				err = 1;
 			}
 			break;
 
-		case 'h':	/* help */
-			printf(usage, argv[0]);
-			exit(EXIT_SUCCESS);
-
-		default:	/* '?' */
+		case '?':
+		default:
 			err = 1;
 			break;
 		}
@@ -68,40 +65,58 @@ main(int argc, char *argv[])
 }
 
 int
-send_msg(char *server, int port)
+send_msg(char *server, char *port)
 {
-	struct sockaddr_in servaddr;
-	socklen_t servaddr_len  = sizeof(servaddr);
-	int fd;
+	struct addrinfo hints;
+	struct addrinfo *res, *rp;
+	int sfd, s;
 	char buf[BUFSIZE] = "This packet is from client";
 
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = 0;
+	hints.ai_protocol = 0;
 
-	/* create a UDP socket */
-
-	fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (fd == -1) {
-		perror("socket creation failed");
+	s = getaddrinfo(server, port, &hints, &res);
+	if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
 		return 1;
 	}
 
-	/* Filling server information */
+	/*
+	 * Try each address until we successfully connect().
+	 * If socket() (or connect()) fails, we (close the socket
+	 * and) try the next address.
+	 */
 
-	memset((char *) &servaddr, 0, sizeof(servaddr));
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = htons(port);
-	if (inet_aton(server, &servaddr.sin_addr) == 0) {
-		fprintf(stderr, "inet_aton() failed\n");
+	for (rp = res; rp != NULL; rp = rp->ai_next) {
+		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if (sfd == -1)
+			continue;
+
+		if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
+			break;					/* Success */
+
+		close(sfd);
+	}
+
+	if (rp == NULL) {				/* No address succeeded */
+		fprintf(stderr, "Could not connect\n");
 		return 1;
 	}
+
+	freeaddrinfo(res);				/* No longer needed */
+
 
 	/* send the messages */
 
-	printf("Sending packet to %s port %d\n", server, port);
-	if (sendto(fd, buf, strlen(buf), 0, (struct sockaddr *)&servaddr, servaddr_len) == -1) {
+	printf("Sending packet to %s port %s\n", server, port);
+	if (send(sfd, buf, strlen(buf), 0) == -1) {
 		perror("sendto");
 		return 1;
 	}
 
-	close(fd);
+	close(sfd);
 	return 0;
 }
