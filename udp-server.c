@@ -8,6 +8,7 @@
 #include <getopt.h>	/* for getopt_long() */
 #include <unistd.h>	/* for close() */
 #include "shared.h"
+#include "control_socket.h"
 
 void receive_msg(char *port);
 
@@ -60,7 +61,7 @@ void
 receive_msg(char *port)
 {
 	struct addrinfo hints;
-	struct addrinfo *res, *rp;
+	struct addrinfo *res;
 	int sfd, s;
 	struct sockaddr_storage peer_addr;
 	socklen_t peer_addr_len;
@@ -83,25 +84,9 @@ receive_msg(char *port)
 		exit(EXIT_FAILURE);
 	}
 
-	/*
-	 * Try each address until we successfully bind().
-	 * If socket() (or bind()) fails, we (close the socket
-	 * and) try the next address.
-	 */
-
-	for (rp = res; rp != NULL; rp = rp->ai_next) {
-		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		if (sfd == -1)
-			continue;
-
-		if (bind(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
-			break;					/* Success */
-
-		close(sfd);
-	}
-
-	if (rp == NULL) {				/* No address succeeded */
-		fprintf(stderr, "Could not bind\n");
+	sfd = bind_socket(&res);
+	if(sfd == -1) {
+		fprintf(stderr, "Could not bind_socket()\n");
 		exit(EXIT_FAILURE);
 	}
 

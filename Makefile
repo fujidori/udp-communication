@@ -4,11 +4,11 @@ CFLAGS = -O2 -W -Wall -Wextra -Werror -Wconversion -Wmissing-prototypes -Wmissin
 .PHONY: all
 all: udp-server udp-client
 
-udp-server: udp-server.o
-	$(CC) $(CFLAGS) -o udp-server udp-server.o
+udp-server: udp-server.o control_socket.o
+	$(CC) $(CFLAGS) -o udp-server udp-server.o control_socket.o
 
-udp-client: udp-client.o
-	$(CC) $(CFLAGS) -o udp-client udp-client.o
+udp-client: udp-client.o control_socket.o
+	$(CC) $(CFLAGS) -o udp-client udp-client.o control_socket.o
 
 .SUFFIXES: .c .o
 .c.o:

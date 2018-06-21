@@ -8,6 +8,7 @@
 #include <getopt.h>	/* for getopt_long() */
 #include <unistd.h>	/* for close() */
 #include "shared.h"
+#include "control_socket.h"
 
 int send_msg(char *server, char *port);
 
@@ -68,7 +69,7 @@ int
 send_msg(char *server, char *port)
 {
 	struct addrinfo hints;
-	struct addrinfo *res, *rp;
+	struct addrinfo *res;
 	int sfd, s;
 	char buf[BUFSIZE] = "This packet is from client";
 
@@ -84,25 +85,9 @@ send_msg(char *server, char *port)
 		return 1;
 	}
 
-	/*
-	 * Try each address until we successfully connect().
-	 * If socket() (or connect()) fails, we (close the socket
-	 * and) try the next address.
-	 */
-
-	for (rp = res; rp != NULL; rp = rp->ai_next) {
-		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		if (sfd == -1)
-			continue;
-
-		if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
-			break;					/* Success */
-
-		close(sfd);
-	}
-
-	if (rp == NULL) {				/* No address succeeded */
-		fprintf(stderr, "Could not connect\n");
+	sfd = connect_socket(&res);
+	if(sfd == -1) {
+		fprintf(stderr, "Could not connect_socket()\n");
 		return 1;
 	}
 
