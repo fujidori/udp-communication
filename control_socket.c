@@ -9,7 +9,10 @@
 #include <unistd.h>
 #include "control_socket.h"
 
-int
+static int bind_socket(struct addrinfo **res);
+static int connect_socket(struct addrinfo **res);
+
+static int
 bind_socket(struct addrinfo **res)
 {
 	int fd;
@@ -40,13 +43,12 @@ bind_socket(struct addrinfo **res)
 	return fd;
 }
 
-int
+static int
 connect_socket(struct addrinfo **res)
 {
 	int fd;
 	struct addrinfo *rp;
 
-	// ----------------------------------------
 	/*
 	 * Try each address until we successfully connect().
 	 * If socket() (or connect()) fails, we (close the socket
@@ -103,10 +105,12 @@ send_msg(char *server, char *port)
 
 	/* send the messages */
 
-	printf("Sending packet to %s port %s\n", server, port);
-	if (send(sfd, buf, strlen(buf), 0) == -1) {
-		perror("sendto");
-		return 1;
+	for (;;) {
+		printf("Sending packet to %s:%s\n", server, port);
+		if (send(sfd, buf, strlen(buf), 0) == -1) {
+			perror("sendto");
+			return 1;
+		}
 	}
 
 	close(sfd);
@@ -123,7 +127,6 @@ recv_msg(char *port)
 	socklen_t peer_addr_len;
 	char buf[BUFSIZE];	/* receive buffer */
 	ssize_t recvlen;		/* bytes received */
-
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -154,7 +157,7 @@ recv_msg(char *port)
 	for (;;) {
 		peer_addr_len = sizeof(struct sockaddr_storage);
 		recvlen = recvfrom(sfd, buf, BUFSIZE, 0,
-				(struct sockaddr *) &peer_addr, &peer_addr_len);
+					(struct sockaddr *) &peer_addr, &peer_addr_len);
 		if (recvlen == -1)
 			continue;				/* Ignore failed request */
 		buf[recvlen] = '\0';

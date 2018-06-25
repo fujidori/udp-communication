@@ -1,13 +1,6 @@
-#include <sys/socket.h>	/* for socket() */
-#include <sys/types.h>
-#include <arpa/inet.h>	/* for sockaddr_in, inet_ntoa() */
-#include <netdb.h>	/* for addrinfo */
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>	/* for EXIT_FAILURE */
-#include <string.h>	/* for strlen(), memset() */
-#include <getopt.h>	/* for getopt_long() */
-#include <unistd.h>	/* for close() */
+#include <getopt.h>
 #include "default.h"
 #include "control_socket.h"
 
