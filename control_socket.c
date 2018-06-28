@@ -109,6 +109,7 @@ send_msg(char *server, char *port)
 		printf("Sending packet to %s:%s\n", server, port);
 		if (send(sfd, buf, strlen(buf), 0) == -1) {
 			perror("sendto");
+			close(sfd);
 			return 1;
 		}
 	}
