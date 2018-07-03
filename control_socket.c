@@ -17,6 +17,11 @@ static int (*set_socket[])(struct addrinfo **res) = {
 	connect_socket,
 };
 
+typedef struct{
+	int seq_num;
+	char data[BUFSIZE];
+}UDP_DATA;
+
 static int
 bind_socket(struct addrinfo **res)
 {
@@ -85,7 +90,9 @@ send_msg(char *server, char *port)
 	struct addrinfo hints;
 	struct addrinfo *res;
 	int sfd, s;
-	char buf[BUFSIZE] = "This packet is from client";
+	UDP_DATA udata;
+	udata.seq_num = 0;
+	strcpy(udata.data, "This packet is from client");
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -112,11 +119,12 @@ send_msg(char *server, char *port)
 
 	for (;;) {
 		printf("Sending packet to %s:%s\n", server, port);
-		if (send(sfd, buf, strlen(buf), 0) == -1) {
+		if (send(sfd, &udata, sizeof(udata), 0) == -1) {
 			perror("sendto");
 			close(sfd);
 			return 1;
 		}
+		udata.seq_num++;
 	}
 
 	close(sfd);
@@ -129,10 +137,12 @@ recv_msg(char *port)
 	struct addrinfo hints;
 	struct addrinfo *res;
 	int sfd, s;
+	int recvcount;
 	struct sockaddr_storage peer_addr;
 	socklen_t peer_addr_len;
-	char buf[BUFSIZE];	/* receive buffer */
+	UDP_DATA udata;			/* receive buffer */
 	ssize_t recvlen;		/* bytes received */
+	recvcount = 0;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -162,11 +172,11 @@ recv_msg(char *port)
 
 	for (;;) {
 		peer_addr_len = sizeof(struct sockaddr_storage);
-		recvlen = recvfrom(sfd, buf, BUFSIZE, 0,
+		recvlen = recvfrom(sfd, &udata, sizeof(udata), 0,
 					(struct sockaddr *) &peer_addr, &peer_addr_len);
 		if (recvlen == -1)
 			continue;				/* Ignore failed request */
-		buf[recvlen] = '\0';
+		udata.data[recvlen] = '\0';
 
 		char host[NI_MAXHOST], service[NI_MAXSERV];
 
@@ -174,9 +184,15 @@ recv_msg(char *port)
 						host, NI_MAXHOST, service, NI_MAXSERV, 
 						NI_NUMERICHOST | NI_NUMERICSERV);
 		if (s == 0) {
-			printf("Received %zd bytes from %s:%s\n", recvlen, host, service);
+			printf("Received %zd bytes, seq_num:%d from %s:%s\n",
+					recvlen, udata.seq_num, host, service);
+			recvcount++;
 		} else
 			fprintf(stderr, "getnameinfo: %s\n", gai_strerror(s));
+
+		if(udata.seq_num % 1000 == 0)
+			printf("Loss data:%lf%%\n",
+					100 * (1 - ((double)recvcount/((double)udata.seq_num + 1))));
 	}
 
 	/* NOTREACHED */
