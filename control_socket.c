@@ -12,6 +12,11 @@
 static int bind_socket(struct addrinfo **res);
 static int connect_socket(struct addrinfo **res);
 
+static int (*set_socket[])(struct addrinfo **res) = {
+	bind_socket,
+	connect_socket,
+};
+
 static int
 bind_socket(struct addrinfo **res)
 {
@@ -94,7 +99,7 @@ send_msg(char *server, char *port)
 		return 1;
 	}
 
-	sfd = connect_socket(&res);
+	sfd = (*set_socket[1])(&res);	/* call connect_socket */
 	if(sfd == -1) {
 		fprintf(stderr, "Could not connect_socket()\n");
 		return 1;
@@ -144,7 +149,7 @@ recv_msg(char *port)
 		exit(EXIT_FAILURE);
 	}
 
-	sfd = bind_socket(&res);
+	sfd = (*set_socket[0])(&res);	/* call bind_socket */
 	if(sfd == -1) {
 		fprintf(stderr, "Could not bind_socket()\n");
 		exit(EXIT_FAILURE);
