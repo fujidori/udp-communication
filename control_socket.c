@@ -17,10 +17,10 @@ static int (*set_socket[])(struct addrinfo **res) = {
 	connect_socket,
 };
 
-typedef struct{
+struct UDP_DATA{
 	int seq_num;
 	char data[BUFSIZE];
-}UDP_DATA;
+};
 
 static int
 bind_socket(struct addrinfo **res)
@@ -90,7 +90,7 @@ send_msg(char *server, char *port)
 	struct addrinfo hints;
 	struct addrinfo *res;
 	int sfd, s;
-	UDP_DATA udata;
+	struct UDP_DATA udata;
 	udata.seq_num = 0;
 	strcpy(udata.data, "This packet is from client");
 
@@ -140,7 +140,7 @@ recv_msg(char *port)
 	int recvcount;
 	struct sockaddr_storage peer_addr;
 	socklen_t peer_addr_len;
-	UDP_DATA udata;			/* receive buffer */
+	struct UDP_DATA udata;		/* receive buffer */
 	ssize_t recvlen;		/* bytes received */
 	recvcount = 0;
 
