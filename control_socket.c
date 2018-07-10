@@ -9,28 +9,32 @@
 #include <unistd.h>
 #include "control_socket.h"
 
-static int bind_socket(struct addrinfo **res);
-static int connect_socket(struct addrinfo **res);
-
-static int (*set_socket[])(struct addrinfo **res) = {
-	bind_socket,
-	connect_socket,
+enum action {
+	BIND = 0,
+	CONNECT
 };
 
-struct UDP_DATA{
+static int set_socket(struct addrinfo **res, enum action act);
+
+struct UDP_DATA {
 	int seq_num;
 	char data[BUFSIZE];
 };
 
 static int
-bind_socket(struct addrinfo **res)
+set_socket(struct addrinfo **res, enum action act)
 {
 	int fd;
 	struct addrinfo *rp;
+	int (*func[])(int sockfd, const struct sockaddr *addr, socklen_t addrlen) = {
+		bind,
+		connect,
+	};
+
 
 	/*
-	 * Try each address until we successfully bind().
-	 * If socket() (or bind()) fails, we (close the socket
+	 * Try each address until we successfully bind() or connect().
+	 * If socket() (or bind(), connect()) fails, we (close the socket
 	 * and) try the next address.
 	 */
 
@@ -39,7 +43,7 @@ bind_socket(struct addrinfo **res)
 		if (fd == -1)
 			continue;
 
-		if (bind(fd, rp->ai_addr, rp->ai_addrlen) == 0)
+		if ((*func[act])(fd, rp->ai_addr, rp->ai_addrlen) == 0)
 			break;					/* Success */
 
 		close(fd);
@@ -47,37 +51,6 @@ bind_socket(struct addrinfo **res)
 
 	if (rp == NULL) {				/* No address succeeded */
 		fprintf(stderr, "Could not bind\n");
-		return -1;
-	}
-
-	return fd;
-}
-
-static int
-connect_socket(struct addrinfo **res)
-{
-	int fd;
-	struct addrinfo *rp;
-
-	/*
-	 * Try each address until we successfully connect().
-	 * If socket() (or connect()) fails, we (close the socket
-	 * and) try the next address.
-	 */
-
-	for (rp = *res; rp != NULL; rp = rp->ai_next) {
-		fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		if (fd == -1)
-			continue;
-	
-		if (connect(fd, rp->ai_addr, rp->ai_addrlen) != -1)
-			break;					/* Success */
-	
-		close(fd);
-	}
-	
-	if (rp == NULL) {				/* No address succeeded */
-		fprintf(stderr, "Could not connect\n");
 		return -1;
 	}
 
@@ -106,7 +79,7 @@ send_msg(char *server, char *port)
 		return 1;
 	}
 
-	sfd = (*set_socket[1])(&res);	/* call connect_socket */
+	sfd = set_socket(&res, CONNECT);	/* connect socket */
 	if(sfd == -1) {
 		fprintf(stderr, "Could not connect_socket()\n");
 		return 1;
@@ -159,7 +132,7 @@ recv_msg(char *port)
 		exit(EXIT_FAILURE);
 	}
 
-	sfd = (*set_socket[0])(&res);	/* call bind_socket */
+	sfd = set_socket(&res, BIND);	/* bind socket */
 	if(sfd == -1) {
 		fprintf(stderr, "Could not bind_socket()\n");
 		exit(EXIT_FAILURE);
