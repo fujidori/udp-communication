@@ -17,7 +17,7 @@ enum action {
 
 static int set_socket(struct addrinfo **res, enum action act);
 static int send_data(int sockfd, uint8_t *data, size_t len);
-static int recv_all(int sockfd, uint8_t *data, size_t len);
+static int recv_entry(int sockfd, uint8_t *data, size_t len);
 
 struct hdr {
 	uint32_t seq;
@@ -78,12 +78,12 @@ static int send_data(int sockfd, uint8_t *data, size_t len)
 	ptr+=len;
 
 	write(sockfd, sbuf, ptr-sbuf);
-	printf("%ld bytes\n",ptr-sbuf);
+	printf("Sent data: %ld bytes\n",ptr-sbuf);
 
 	return 0;
 }
 
-static int recv_all(int sockfd, uint8_t *data, size_t len)
+static int recv_entry(int sockfd, uint8_t *data, size_t len)
 {
 	struct hdr *hdr;
 	uint8_t sbuf[BUFSIZE];
@@ -100,9 +100,10 @@ static int recv_all(int sockfd, uint8_t *data, size_t len)
 
 	/* print header*/
 	printf("hdr seq:%u, ack:%u\n", hdr->seq, hdr->ack);
+
 	/* print received whole data*/
 	for (int i = 0; i <recvlen ; i++) {
-		printf("Received data: ");
+		printf("bytes of data: ");
 		printf("%" PRIu8 "\n", sbuf[i]);
 	}
 
@@ -194,9 +195,10 @@ recv_msg(char *port)
 
 	for (;;) {
 		printf("-----------------------\n");
-		recvlen = recv_all(sfd, sbuf, sizeof(sbuf));
+		recvlen = recv_entry(sfd, sbuf, sizeof(sbuf));
 		if (recvlen == -1)
 			continue;				/* Ignore failed request */
+		printf("Received data: %s\n", sbuf);
 	}
 
 	/* NOTREACHED */

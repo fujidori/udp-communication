@@ -1,5 +1,5 @@
-#ifndef _SET_SOCKET_H
-#define _SET_SOCKET_H
+#ifndef _CONTROL_SOCKET_H
+#define _CONTROL_SOCKET_H
 
 #define	BUFSIZE	2048
 
