@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <inttypes.h>
 #include "control_socket.h"
 
 enum action {
@@ -15,11 +16,14 @@ enum action {
 };
 
 static int set_socket(struct addrinfo **res, enum action act);
+static int send_data(int sockfd, uint8_t *data, size_t len);
+static int recv_all(int sockfd, uint8_t *data, size_t len);
 
-struct UDP_DATA {
-	int seq_num;
-	char data[BUFSIZE];
-};
+struct hdr {
+	uint32_t seq;
+	uint32_t ack;
+} __attribute__((packed));
+
 
 static int
 set_socket(struct addrinfo **res, enum action act)
@@ -57,15 +61,64 @@ set_socket(struct addrinfo **res, enum action act)
 	return fd;
 }
 
+static int send_data(int sockfd, uint8_t *data, size_t len)
+{
+	u_int8_t *ptr;
+	u_int8_t sbuf[BUFSIZE];
+	struct hdr *hdr;
+
+	ptr = sbuf;
+	hdr = (struct hdr *)ptr;
+	memset(hdr,0,sizeof(struct hdr));
+	hdr->seq = 0;
+	hdr->ack = 0;
+
+	ptr+=sizeof(struct hdr);
+	memcpy(ptr,data,len);
+	ptr+=len;
+
+	write(sockfd, sbuf, ptr-sbuf);
+	printf("%ld bytes\n",ptr-sbuf);
+
+	return 0;
+}
+
+static int recv_all(int sockfd, uint8_t *data, size_t len)
+{
+	struct hdr *hdr;
+	uint8_t sbuf[BUFSIZE];
+	u_int8_t *ptr = sbuf;
+	size_t plen;	// payload length
+	plen = len;
+	hdr=(struct hdr *)ptr;
+	ptr+=sizeof(struct hdr);
+	plen-=sizeof(struct hdr);
+
+	ssize_t recvlen;		/* bytes received */
+
+	recvlen = read(sockfd, sbuf, sizeof(sbuf));
+
+	/* print header*/
+	printf("hdr seq:%u, ack:%u\n", hdr->seq, hdr->ack);
+	/* print received whole data*/
+	for (int i = 0; i <recvlen ; i++) {
+		printf("Received data: ");
+		printf("%" PRIu8 "\n", sbuf[i]);
+	}
+
+	memcpy(data, ptr, plen);
+
+	return plen;
+
+}
+
 int
 send_msg(char *server, char *port)
 {
 	struct addrinfo hints;
 	struct addrinfo *res;
 	int sfd, s;
-	struct UDP_DATA udata;
-	udata.seq_num = 0;
-	strcpy(udata.data, "This packet is from client");
+	uint8_t data = 'a';
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -91,13 +144,13 @@ send_msg(char *server, char *port)
 	/* send the messages */
 
 	for (;;) {
+		printf("-----------------------\n");
 		printf("Sending packet to %s:%s\n", server, port);
-		if (send(sfd, &udata, sizeof(udata), 0) == -1) {
-			perror("sendto");
+		if (send_data(sfd, &data, sizeof(data)) == -1) {
+			perror("send_data");
 			close(sfd);
 			return 1;
 		}
-		udata.seq_num++;
 	}
 
 	close(sfd);
@@ -110,12 +163,8 @@ recv_msg(char *port)
 	struct addrinfo hints;
 	struct addrinfo *res;
 	int sfd, s;
-	int recvcount;
-	struct sockaddr_storage peer_addr;
-	socklen_t peer_addr_len;
-	struct UDP_DATA udata;		/* receive buffer */
+	uint8_t sbuf[BUFSIZE];
 	ssize_t recvlen;		/* bytes received */
-	recvcount = 0;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC;
@@ -144,28 +193,10 @@ recv_msg(char *port)
 	/* now loop, receiving data and printing what we received */
 
 	for (;;) {
-		peer_addr_len = sizeof(struct sockaddr_storage);
-		recvlen = recvfrom(sfd, &udata, sizeof(udata), 0,
-					(struct sockaddr *) &peer_addr, &peer_addr_len);
+		printf("-----------------------\n");
+		recvlen = recv_all(sfd, sbuf, sizeof(sbuf));
 		if (recvlen == -1)
 			continue;				/* Ignore failed request */
-		udata.data[recvlen] = '\0';
-
-		char host[NI_MAXHOST], service[NI_MAXSERV];
-
-		s = getnameinfo((struct sockaddr *) &peer_addr, peer_addr_len,
-						host, NI_MAXHOST, service, NI_MAXSERV, 
-						NI_NUMERICHOST | NI_NUMERICSERV);
-		if (s == 0) {
-			printf("Received %zd bytes, seq_num:%d from %s:%s\n",
-					recvlen, udata.seq_num, host, service);
-			recvcount++;
-		} else
-			fprintf(stderr, "getnameinfo: %s\n", gai_strerror(s));
-
-		if(udata.seq_num % 1000 == 0)
-			printf("Loss data:%lf%%\n",
-					100 * (1 - ((double)recvcount/((double)udata.seq_num + 1))));
 	}
 
 	/* NOTREACHED */
