@@ -1,5 +1,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <arpa/inet.h>	/* for sockaddr_in, inet_ntoa() */
 #include <netdb.h>
 #include <netinet/in.h>
@@ -20,8 +21,9 @@ static int send_data(int sockfd, uint8_t *data, size_t len);
 static int recv_entry(int sockfd, uint8_t *data, size_t len);
 
 struct hdr {
-	uint32_t seq;
-	uint32_t ack;
+	uint32_t seq;	/* sequence number */
+	uint32_t ack;	/* ack number */
+	size_t dlen;	/* data length */
 } __attribute__((packed));
 
 
@@ -63,54 +65,80 @@ set_socket(struct addrinfo **res, enum action act)
 
 static int send_data(int sockfd, uint8_t *data, size_t len)
 {
-	u_int8_t *ptr;
-	u_int8_t sbuf[BUFSIZE];
-	struct hdr *hdr;
+	struct hdr hdr;
 
-	ptr = sbuf;
-	hdr = (struct hdr *)ptr;
-	memset(hdr,0,sizeof(struct hdr));
-	hdr->seq = 0;
-	hdr->ack = 0;
+	int iovcnt;
+	ssize_t bytes_write;
+	struct iovec iov[2];
 
-	ptr+=sizeof(struct hdr);
-	memcpy(ptr,data,len);
-	ptr+=len;
+	hdr.seq = 0;
+	hdr.ack = 0;
+	hdr.dlen = len;
 
-	write(sockfd, sbuf, ptr-sbuf);
-	printf("Sent data: %ld bytes\n",ptr-sbuf);
+	iov[0].iov_base = &hdr;
+	iov[0].iov_len = sizeof(struct hdr);
+	iov[1].iov_base = data;
+	iov[1].iov_len = hdr.dlen;
+	iovcnt = sizeof(iov) / sizeof(struct iovec);
 
-	return 0;
+	bytes_write = writev(sockfd, iov, iovcnt);
+	if(bytes_write == -1) {
+		perror("writev");
+		return(-1);
+	}
+
+
+	/* print sent data*/
+
+	printf("   - Sent data -   \n");
+	printf("hdr seq:%u, ack:%u\n", hdr.seq, hdr.ack);
+	printf("whole data size: %zu bytes\n", bytes_write);
+	printf("data size: %zu bytes\n", iov[1].iov_len);
+
+	printf("bytes of data: ");
+	for (size_t i = 0; i < hdr.dlen; i++)
+		printf("%" PRIu8 " ", data[i]);
+	printf("\n");
+
+	return hdr.dlen;
 }
 
 static int recv_entry(int sockfd, uint8_t *data, size_t len)
 {
-	struct hdr *hdr;
-	uint8_t sbuf[BUFSIZE];
-	u_int8_t *ptr = sbuf;
-	size_t plen;	// payload length
-	plen = len;
-	hdr=(struct hdr *)ptr;
-	ptr+=sizeof(struct hdr);
-	plen-=sizeof(struct hdr);
+	struct hdr hdr;
+	struct iovec iov[2];
+	int iovcnt;
+	ssize_t bytes_read;		/* bytes received */
 
-	ssize_t recvlen;		/* bytes received */
+	iov[0].iov_base = &hdr;
+	iov[0].iov_len = sizeof(struct hdr);
+	iov[1].iov_base = data;
+	iov[1].iov_len = len;
+	iovcnt = sizeof(iov) / sizeof(struct iovec);
 
-	recvlen = read(sockfd, sbuf, sizeof(sbuf));
-
-	/* print header*/
-	printf("hdr seq:%u, ack:%u\n", hdr->seq, hdr->ack);
-
-	/* print received whole data*/
-	for (int i = 0; i <recvlen ; i++) {
-		printf("bytes of data: ");
-		printf("%" PRIu8 "\n", sbuf[i]);
+	bytes_read = readv(sockfd, iov, iovcnt);
+	if(bytes_read == -1) {
+		perror("readv");
+		return(-1);
 	}
 
-	memcpy(data, ptr, plen);
+	data[hdr.dlen] = '\0';
 
-	return plen;
 
+	/* print received data*/
+
+	printf("   - Received data -   \n");
+	printf("hdr seq:%u, ack:%u\n", hdr.seq, hdr.ack);
+	printf("whole data size: %zu bytes\n", bytes_read);
+	printf("data size: %zu bytes\n", hdr.dlen);
+
+	printf("bytes of data: ");
+	for (size_t i = 0; i < hdr.dlen; i++) {
+		printf("%" PRIu8 " ", data[i]);
+	}
+	printf("\n");
+
+	return hdr.dlen;
 }
 
 int
@@ -152,6 +180,7 @@ send_msg(char *server, char *port)
 			close(sfd);
 			return 1;
 		}
+		printf("Sent data: %c\n", data);
 	}
 
 	close(sfd);
