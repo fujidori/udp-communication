@@ -16,7 +16,7 @@ enum action {
 	CONNECT
 };
 
-static int set_socket(struct addrinfo **res, enum action act);
+static int set_socket(const char *server, char *port, enum action act);
 static int send_data(int sockfd, uint8_t *data, size_t len);
 static int recv_entry(int sockfd, uint8_t *data, size_t len);
 
@@ -27,15 +27,38 @@ struct hdr {
 } __attribute__((packed));
 
 
-static int
-set_socket(struct addrinfo **res, enum action act)
+static int set_socket(const char *server, char *port, enum action act)
 {
-	int fd;
+	struct addrinfo hints;
+	struct addrinfo *res;
 	struct addrinfo *rp;
+	int sfd, s;
 	int (*func[])(int sockfd, const struct sockaddr *addr, socklen_t addrlen) = {
 		bind,
 		connect,
 	};
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = 0;
+
+	switch(act) {
+	case BIND:
+		hints.ai_flags = AI_PASSIVE;
+		break;
+	case CONNECT:
+		hints.ai_flags = 0;
+		break;
+	default:
+		hints.ai_flags = 0;
+	}
+
+	s = getaddrinfo(server, port, &hints, &res);
+	if (s != 0) {
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+		exit(EXIT_FAILURE);
+	}
 
 
 	/*
@@ -44,23 +67,31 @@ set_socket(struct addrinfo **res, enum action act)
 	 * and) try the next address.
 	 */
 
-	for (rp = *res; rp != NULL; rp = rp->ai_next) {
-		fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-		if (fd == -1)
+	for (rp = res; rp != NULL; rp = rp->ai_next) {
+		sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+		if (sfd == -1)
 			continue;
 
-		if ((*func[act])(fd, rp->ai_addr, rp->ai_addrlen) == 0)
+		if ((*func[act])(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
 			break;					/* Success */
 
-		close(fd);
+		close(sfd);
 	}
 
 	if (rp == NULL) {				/* No address succeeded */
-		fprintf(stderr, "Could not bind\n");
+		fprintf(stderr, "No address\n");
 		return -1;
 	}
 
-	return fd;
+	if(sfd == -1) {
+		fprintf(stderr, "Could not bind or connect socket\n");
+		close(sfd);
+		exit(EXIT_FAILURE);
+	}
+
+	freeaddrinfo(res);				/* No longer needed */
+
+	return sfd;
 }
 
 static int send_data(int sockfd, uint8_t *data, size_t len)
@@ -144,31 +175,10 @@ static int recv_entry(int sockfd, uint8_t *data, size_t len)
 int
 send_msg(char *server, char *port)
 {
-	struct addrinfo hints;
-	struct addrinfo *res;
-	int sfd, s;
+	int sfd;
 	uint8_t data = 'a';
 
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = 0;
-	hints.ai_protocol = 0;
-
-	s = getaddrinfo(server, port, &hints, &res);
-	if (s != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-		return 1;
-	}
-
-	sfd = set_socket(&res, CONNECT);	/* connect socket */
-	if(sfd == -1) {
-		fprintf(stderr, "Could not connect_socket()\n");
-		return 1;
-	}
-
-	freeaddrinfo(res);				/* No longer needed */
-
+	sfd = set_socket(server, port, CONNECT);
 
 	/* send the messages */
 
@@ -190,35 +200,11 @@ send_msg(char *server, char *port)
 void
 recv_msg(char *port)
 {
-	struct addrinfo hints;
-	struct addrinfo *res;
-	int sfd, s;
+	int sfd;
 	uint8_t sbuf[BUFSIZE];
 	ssize_t recvlen;		/* bytes received */
 
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = AI_PASSIVE;
-	hints.ai_protocol = 0;
-	hints.ai_canonname = NULL;
-	hints.ai_addr = NULL;
-	hints.ai_next = NULL;
-
-	s = getaddrinfo(NULL, port, &hints, &res);
-	if (s != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
-		exit(EXIT_FAILURE);
-	}
-
-	sfd = set_socket(&res, BIND);	/* bind socket */
-	if(sfd == -1) {
-		fprintf(stderr, "Could not bind_socket()\n");
-		exit(EXIT_FAILURE);
-	}
-
-	freeaddrinfo(res);				/* No longer needed */
-
+	sfd = set_socket(NULL, port, BIND);
 
 	/* now loop, receiving data and printing what we received */
 
