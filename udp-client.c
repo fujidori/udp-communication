@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>	/* for EXIT_FAILURE */
 #include <getopt.h>
+#include <inttypes.h>
 #include "default.h"
 #include "control_socket.h"
 
@@ -52,7 +53,7 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	if (send_msg(server, port))
+	if (pseudo_send(server, port) == -1)
 		exit(EXIT_FAILURE);
 	return 0;
 }

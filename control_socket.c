@@ -16,18 +16,26 @@ enum action {
 	CONNECT
 };
 
-static int set_socket(const char *server, char *port, enum action act);
-static int send_data(int sockfd, uint8_t *data, size_t len);
-static int recv_entry(int sockfd, uint8_t *data, size_t len);
-
 struct hdr {
-	uint32_t seq;	/* sequence number */
-	uint32_t ack;	/* ack number */
+	struct sockaddr saddr;
+	struct sockaddr daddr;
+	socklen_t saddrlen;
+	socklen_t daddrlen;
+	uint32_t seq_num;	/* sequence number */
+	uint32_t ack_num;	/* ack number */
+	uint8_t	doff:5,
+		fin:1,
+		syn:1,
+		ack:1;
 	size_t dlen;	/* data length */
 } __attribute__((packed));
 
+static ssize_t send_data(int sockfd, struct hdr *hdr, uint8_t *data, size_t len);
+static ssize_t recv_data(int sockfd, struct hdr *hdr, uint8_t *data, size_t len);
+static int setsock(const char *server, const char *port, struct sockaddr *saddr, socklen_t *saddrlen, enum action act);
 
-static int set_socket(const char *server, char *port, enum action act)
+
+static int setsock(const char *server, const char *port, struct sockaddr *saddr, socklen_t *saddrlen, enum action act)
 {
 	struct addrinfo hints;
 	struct addrinfo *res;
@@ -72,8 +80,13 @@ static int set_socket(const char *server, char *port, enum action act)
 		if (sfd == -1)
 			continue;
 
-		if ((*func[act])(sfd, rp->ai_addr, rp->ai_addrlen) == 0)
+		if ((*func[act])(sfd, rp->ai_addr, rp->ai_addrlen) == 0){
+			if(saddr != NULL && saddrlen != NULL){
+				memcpy(saddr, rp->ai_addr, sizeof(struct sockaddr));
+				*saddrlen = rp->ai_addrlen;
+			}
 			break;					/* Success */
+		}
 
 		close(sfd);
 	}
@@ -94,54 +107,59 @@ static int set_socket(const char *server, char *port, enum action act)
 	return sfd;
 }
 
-static int send_data(int sockfd, uint8_t *data, size_t len)
-{
-	struct hdr hdr;
 
+/*
+ * Send hdr and data
+ */
+static ssize_t
+send_data(int sockfd, struct hdr *hdr, uint8_t *data, size_t len)
+{
+	struct iovec iov[2];
 	int iovcnt;
 	ssize_t bytes_write;
-	struct iovec iov[2];
 
-	hdr.seq = 0;
-	hdr.ack = 0;
-	hdr.dlen = len;
+	hdr->dlen = len;
 
-	iov[0].iov_base = &hdr;
+	iov[0].iov_base = hdr;
 	iov[0].iov_len = sizeof(struct hdr);
 	iov[1].iov_base = data;
-	iov[1].iov_len = hdr.dlen;
+	iov[1].iov_len = hdr->dlen;
 	iovcnt = sizeof(iov) / sizeof(struct iovec);
 
 	bytes_write = writev(sockfd, iov, iovcnt);
 	if(bytes_write == -1) {
 		perror("writev");
-		return(-1);
+		return -1;
 	}
 
 
 	/* print sent data*/
-
 	printf("   - Sent data -   \n");
-	printf("hdr seq:%u, ack:%u\n", hdr.seq, hdr.ack);
+	printf("hdr seq:%u, ack:%u\n", hdr->seq_num, hdr->ack_num);
 	printf("whole data size: %zu bytes\n", bytes_write);
 	printf("data size: %zu bytes\n", iov[1].iov_len);
 
 	printf("bytes of data: ");
-	for (size_t i = 0; i < hdr.dlen; i++)
+	for (size_t i = 0; i < hdr->dlen; i++)
 		printf("%" PRIu8 " ", data[i]);
 	printf("\n");
 
-	return hdr.dlen;
+	return hdr->dlen;
 }
 
-static int recv_entry(int sockfd, uint8_t *data, size_t len)
+
+/*
+ * Receive data, separate hdr from data.
+ * Return hdr, data and datalen
+ */
+static ssize_t
+recv_data(int sockfd, struct hdr *hdr, uint8_t *data, size_t len)
 {
-	struct hdr hdr;
 	struct iovec iov[2];
 	int iovcnt;
 	ssize_t bytes_read;		/* bytes received */
 
-	iov[0].iov_base = &hdr;
+	iov[0].iov_base = hdr;
 	iov[0].iov_len = sizeof(struct hdr);
 	iov[1].iov_base = data;
 	iov[1].iov_len = len;
@@ -150,72 +168,144 @@ static int recv_entry(int sockfd, uint8_t *data, size_t len)
 	bytes_read = readv(sockfd, iov, iovcnt);
 	if(bytes_read == -1) {
 		perror("readv");
-		return(-1);
+		return -1;
 	}
 
-	data[hdr.dlen] = '\0';
-
+	data[hdr->dlen] = '\0';
 
 	/* print received data*/
-
 	printf("   - Received data -   \n");
-	printf("hdr seq:%u, ack:%u\n", hdr.seq, hdr.ack);
+	printf("hdr seq:%u, ack:%u\n", hdr->seq_num, hdr->ack_num);
 	printf("whole data size: %zu bytes\n", bytes_read);
-	printf("data size: %zu bytes\n", hdr.dlen);
+	printf("data size: %zu bytes\n", hdr->dlen);
 
 	printf("bytes of data: ");
-	for (size_t i = 0; i < hdr.dlen; i++) {
+	for (size_t i = 0; i < hdr->dlen; i++) {
 		printf("%" PRIu8 " ", data[i]);
 	}
 	printf("\n");
 
-	return hdr.dlen;
+	return hdr->dlen;
 }
 
-int
-send_msg(char *server, char *port)
+
+/*
+ * Send data, receive ack
+ */
+ssize_t
+pseudo_send(char *server, char *port)
 {
-	int sfd;
+	/* data */
 	uint8_t data = 'a';
 
-	sfd = set_socket(server, port, CONNECT);
+	/* socket*/
+	int sfd;	/* source fd */
+	int rfd;	/* destination fd */
+	uint8_t rbuf[BUFSIZE];
+	ssize_t recvlen;
+	ssize_t sendlen;
 
-	/* send the messages */
+	struct sockaddr daddr;	/* destination address */
+	struct sockaddr saddr;	/* source address */
+	socklen_t daddrlen;
+	socklen_t saddrlen;
 
-	for (;;) {
-		printf("-----------------------\n");
-		printf("Sending packet to %s:%s\n", server, port);
-		if (send_data(sfd, &data, sizeof(data)) == -1) {
-			perror("send_data");
-			close(sfd);
-			return 1;
-		}
-		printf("Sent data: %c\n", data);
+	sfd = setsock(server, port, &daddr, &daddrlen, CONNECT);
+	rfd = setsock(NULL, "55555", &saddr, &saddrlen, BIND);
+
+	/* header */
+	struct hdr hdr;
+	hdr.seq_num = 0;
+	hdr.ack_num = 0;
+	hdr.dlen = sizeof(data);
+	hdr.ack = 1;
+	hdr.fin = 0;
+	hdr.syn = 0;
+	hdr.daddr = daddr;
+	hdr.daddrlen = daddrlen;
+	hdr.saddr = saddr;
+	hdr.saddrlen = saddrlen;
+
+
+	/* send data */
+	printf("-----------------------\n");
+	printf("Sending packet to %s:%s\n", server, port);
+	sendlen = send_data(sfd, &hdr, &data, sizeof(data));
+	if (sendlen == -1) {
+		perror("send_data");
+		close(sfd);
+		return 1;
 	}
-
+	printf("Sent data: %c\n", data);
 	close(sfd);
-	return 0;
+
+
+	/* receive ack */
+	struct hdr rhdr;
+	recvlen = recv_data(rfd, &rhdr, rbuf, sizeof(rbuf));
+	if (recvlen == -1){
+		fprintf(stderr, "Could not recv_data()\n");
+		close(rfd);
+		return -1;
+	}
+	printf("Received data: %s\n", rbuf);
+	close(rfd);
+
+	return sendlen;
 }
 
-void
-recv_msg(char *port)
+
+/*
+ * Receive hdr, send ack
+ */
+ssize_t
+pseudo_recv(char *port, uint8_t *buf, ssize_t buflen)
 {
 	int sfd;
-	uint8_t sbuf[BUFSIZE];
+	struct sockaddr saddr;	/* source sockaddr */
+	socklen_t slen;
+
 	ssize_t recvlen;		/* bytes received */
 
-	sfd = set_socket(NULL, port, BIND);
+	struct hdr shdr;
 
-	/* now loop, receiving data and printing what we received */
+	sfd = setsock(NULL, port, &saddr, &slen, BIND);
 
-	for (;;) {
-		printf("-----------------------\n");
-		recvlen = recv_entry(sfd, sbuf, sizeof(sbuf));
-		if (recvlen == -1)
-			continue;				/* Ignore failed request */
-		printf("Received data: %s\n", sbuf);
+	printf("-----------------------\n");
+	recvlen = recv_data(sfd, &shdr, buf, buflen);
+	if (recvlen == -1){
+		fprintf(stderr, "Could not recv_data()\n");
+		close(sfd);
+		return -1;
+	}
+	printf("Received data: %s\n", buf);
+
+	struct hdr ackhdr;
+	ackhdr.saddr = saddr;
+	ackhdr.daddr = shdr.saddr;
+	ackhdr.ack = 0;
+	ackhdr.syn = 0;
+	ackhdr.fin = 0;
+	ackhdr.seq_num = shdr.ack_num;
+	ackhdr.ack_num = shdr.seq_num + shdr.dlen;
+
+	int dfd;
+	dfd = socket(shdr.saddr.sa_family, SOCK_DGRAM, 0);
+	if(connect(dfd, &shdr.saddr, shdr.saddrlen) == -1){
+		perror("connect");
+		return -1;
 	}
 
-	/* NOTREACHED */
+	/* send ack */
+	printf("  -- Sending ack --  \n");
+	if(send_data(dfd, &ackhdr, 0, 0) == -1){
+		fprintf(stderr, "Could not send_ack()\n");
+		close(sfd);
+		close(dfd);
+		return -1;
+	}
+
 	close(sfd);
+	close(dfd);
+	return recvlen;
 }

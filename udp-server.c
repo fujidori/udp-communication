@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>	/* for EXIT_FAILURE */
 #include <getopt.h>
+#include <inttypes.h>
 #include "default.h"
 #include "control_socket.h"
 
@@ -45,6 +46,12 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	recv_msg(port);
+	uint8_t buf[BUFSIZE];
+	ssize_t recvlen;
+	recvlen = pseudo_recv(port, buf, BUFSIZE);
+	if (recvlen == -1){
+		fprintf(stderr, "Could not pseudo_recv()\n");
+		return -1;
+	}
 	/* NOTREACHED */
 }

@@ -3,7 +3,7 @@
 
 #define	BUFSIZE	256
 
-int	send_msg(char *server, char *port);
-void	recv_msg(char *port);
+ssize_t	pseudo_send(char *server, char *port);
+ssize_t pseudo_recv(char *port, uint8_t *buf, ssize_t buflen);
 
 #endif
