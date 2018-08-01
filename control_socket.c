@@ -32,10 +32,13 @@ struct hdr {
 
 static ssize_t send_data(int sockfd, struct hdr *hdr, uint8_t *data, size_t len);
 static ssize_t recv_data(int sockfd, struct hdr *hdr, uint8_t *data, size_t len);
-static int setsock(const char *server, const char *port, struct sockaddr *saddr, socklen_t *saddrlen, enum action act);
+static int setsock(const char *server, const char *port, struct sockaddr *saddr,
+		socklen_t *saddrlen, enum action act);
 
 
-static int setsock(const char *server, const char *port, struct sockaddr *saddr, socklen_t *saddrlen, enum action act)
+static int
+setsock(const char *server, const char *port, struct sockaddr *saddr,
+		socklen_t *saddrlen, enum action act)
 {
 	struct addrinfo hints;
 	struct addrinfo *res;
