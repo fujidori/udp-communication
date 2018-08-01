@@ -210,8 +210,8 @@ pseudo_send(char *server, char *port)
 	socklen_t saddrlen;
 	socklen_t daddrlen;
 
-	sfd = setsock(server, port, &daddr, &daddrlen, CONNECT);
-	dfd = setsock(NULL, "55555", &saddr, &saddrlen, BIND);
+	dfd = setsock(server, port, &daddr, &daddrlen, CONNECT);
+	sfd = setsock(NULL, "55555", &saddr, &saddrlen, BIND);
 
 	/* header */
 	struct hdr shdr;	/* send hdr */
@@ -231,7 +231,7 @@ pseudo_send(char *server, char *port)
 	/* send data */
 	printf("-----------------------\n");
 	printf("Sending packet to %s:%s\n", server, port);
-	sendlen = send_data(sfd, &shdr, &data, sizeof(data));
+	sendlen = send_data(dfd, &shdr, &data, sizeof(data));
 	if (sendlen == -1) {
 		perror("send_data");
 		close(sfd);
@@ -244,7 +244,7 @@ pseudo_send(char *server, char *port)
 	/* receive and check ack */
 
 	do{
-		recvlen = recv_data(dfd, &rhdr, rbuf, sizeof(rbuf));
+		recvlen = recv_data(sfd, &rhdr, rbuf, sizeof(rbuf));
 		if (recvlen == -1){
 			fprintf(stderr, "Could not recv_data()\n");
 			close(dfd);
@@ -268,18 +268,18 @@ pseudo_recv(char *port, uint8_t *buf, ssize_t buflen)
 {
 	int sfd;	/* source fd */
 	int dfd;	/* destination fd */
-	struct sockaddr saddr;	/* source sockaddr */
-	socklen_t slen;
+	struct sockaddr raddr;	/* receive sockaddr */
+	socklen_t rlen;
 
 	ssize_t recvlen;		/* bytes received */
 
-	struct hdr shdr;	/* source hdr */
+	struct hdr rhdr;	/* receive hdr */
 	struct hdr ack;	/* ack hdr */
 
-	sfd = setsock(NULL, port, &saddr, &slen, BIND);
+	sfd = setsock(NULL, port, &raddr, &rlen, BIND);
 
 	printf("-----------------------\n");
-	recvlen = recv_data(sfd, &shdr, buf, buflen);
+	recvlen = recv_data(sfd, &rhdr, buf, buflen);
 	if (recvlen == -1){
 		fprintf(stderr, "Could not recv_data()\n");
 		close(sfd);
@@ -287,17 +287,17 @@ pseudo_recv(char *port, uint8_t *buf, ssize_t buflen)
 	}
 	printf("Received data: %s\n", buf);
 
-	ack.saddr = saddr;
-	ack.daddr = shdr.saddr;
+	ack.saddr = raddr;
+	ack.daddr = rhdr.saddr;
 	ack.ack = 0;
 	ack.syn = 0;
 	ack.fin = 0;
-	ack.seq_num = shdr.ack_num;
-	ack.ack_num = shdr.seq_num + shdr.dlen;
+	ack.seq_num = rhdr.ack_num;
+	ack.ack_num = rhdr.seq_num + rhdr.dlen;
 
 
-	dfd = socket(shdr.saddr.sa_family, SOCK_DGRAM, 0);
-	if(connect(dfd, &shdr.saddr, shdr.saddrlen) == -1){
+	dfd = socket(rhdr.saddr.sa_family, SOCK_DGRAM, 0);
+	if(connect(dfd, &rhdr.saddr, rhdr.saddrlen) == -1){
 		perror("connect");
 		return -1;
 	}
