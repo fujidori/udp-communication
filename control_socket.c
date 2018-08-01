@@ -240,15 +240,20 @@ pseudo_send(char *server, char *port)
 	close(sfd);
 
 
-	/* receive ack */
+	/* receive and check ack */
 	struct hdr rhdr;
-	recvlen = recv_data(rfd, &rhdr, rbuf, sizeof(rbuf));
-	if (recvlen == -1){
-		fprintf(stderr, "Could not recv_data()\n");
-		close(rfd);
-		return -1;
-	}
-	printf("Received data: %s\n", rbuf);
+
+	do{
+		recvlen = recv_data(rfd, &rhdr, rbuf, sizeof(rbuf));
+		if (recvlen == -1){
+			fprintf(stderr, "Could not recv_data()\n");
+			close(rfd);
+			return -1;
+		}
+		printf("Received data: %s\n", rbuf);
+	}while(rhdr.ack_num != hdr.seq_num + hdr.dlen);
+
+
 	close(rfd);
 
 	return sendlen;
