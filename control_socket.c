@@ -200,37 +200,38 @@ pseudo_send(char *server, char *port)
 
 	/* socket*/
 	int sfd;	/* source fd */
-	int rfd;	/* destination fd */
+	int dfd;	/* destination fd */
 	uint8_t rbuf[BUFSIZE];
 	ssize_t recvlen;
 	ssize_t sendlen;
 
-	struct sockaddr daddr;	/* destination address */
 	struct sockaddr saddr;	/* source address */
-	socklen_t daddrlen;
+	struct sockaddr daddr;	/* destination address */
 	socklen_t saddrlen;
+	socklen_t daddrlen;
 
 	sfd = setsock(server, port, &daddr, &daddrlen, CONNECT);
-	rfd = setsock(NULL, "55555", &saddr, &saddrlen, BIND);
+	dfd = setsock(NULL, "55555", &saddr, &saddrlen, BIND);
 
 	/* header */
-	struct hdr hdr;
-	hdr.seq_num = 0;
-	hdr.ack_num = 0;
-	hdr.dlen = sizeof(data);
-	hdr.ack = 1;
-	hdr.fin = 0;
-	hdr.syn = 0;
-	hdr.daddr = daddr;
-	hdr.daddrlen = daddrlen;
-	hdr.saddr = saddr;
-	hdr.saddrlen = saddrlen;
+	struct hdr shdr;	/* send hdr */
+	shdr.seq_num = 0;
+	shdr.ack_num = 0;
+	shdr.dlen = sizeof(data);
+	shdr.ack = 1;
+	shdr.fin = 0;
+	shdr.syn = 0;
+	shdr.daddr = daddr;
+	shdr.daddrlen = daddrlen;
+	shdr.saddr = saddr;
+	shdr.saddrlen = saddrlen;
 
+	struct hdr rhdr;	/* received hdr */
 
 	/* send data */
 	printf("-----------------------\n");
 	printf("Sending packet to %s:%s\n", server, port);
-	sendlen = send_data(sfd, &hdr, &data, sizeof(data));
+	sendlen = send_data(sfd, &shdr, &data, sizeof(data));
 	if (sendlen == -1) {
 		perror("send_data");
 		close(sfd);
@@ -241,20 +242,19 @@ pseudo_send(char *server, char *port)
 
 
 	/* receive and check ack */
-	struct hdr rhdr;
 
 	do{
-		recvlen = recv_data(rfd, &rhdr, rbuf, sizeof(rbuf));
+		recvlen = recv_data(dfd, &rhdr, rbuf, sizeof(rbuf));
 		if (recvlen == -1){
 			fprintf(stderr, "Could not recv_data()\n");
-			close(rfd);
+			close(dfd);
 			return -1;
 		}
 		printf("Received data: %s\n", rbuf);
-	}while(rhdr.ack_num != hdr.seq_num + hdr.dlen);
+	}while(rhdr.ack_num != shdr.seq_num + shdr.dlen);
 
 
-	close(rfd);
+	close(dfd);
 
 	return sendlen;
 }
@@ -266,13 +266,15 @@ pseudo_send(char *server, char *port)
 ssize_t
 pseudo_recv(char *port, uint8_t *buf, ssize_t buflen)
 {
-	int sfd;
+	int sfd;	/* source fd */
+	int dfd;	/* destination fd */
 	struct sockaddr saddr;	/* source sockaddr */
 	socklen_t slen;
 
 	ssize_t recvlen;		/* bytes received */
 
-	struct hdr shdr;
+	struct hdr shdr;	/* source hdr */
+	struct hdr ack;	/* ack hdr */
 
 	sfd = setsock(NULL, port, &saddr, &slen, BIND);
 
@@ -285,16 +287,15 @@ pseudo_recv(char *port, uint8_t *buf, ssize_t buflen)
 	}
 	printf("Received data: %s\n", buf);
 
-	struct hdr ackhdr;
-	ackhdr.saddr = saddr;
-	ackhdr.daddr = shdr.saddr;
-	ackhdr.ack = 0;
-	ackhdr.syn = 0;
-	ackhdr.fin = 0;
-	ackhdr.seq_num = shdr.ack_num;
-	ackhdr.ack_num = shdr.seq_num + shdr.dlen;
+	ack.saddr = saddr;
+	ack.daddr = shdr.saddr;
+	ack.ack = 0;
+	ack.syn = 0;
+	ack.fin = 0;
+	ack.seq_num = shdr.ack_num;
+	ack.ack_num = shdr.seq_num + shdr.dlen;
 
-	int dfd;
+
 	dfd = socket(shdr.saddr.sa_family, SOCK_DGRAM, 0);
 	if(connect(dfd, &shdr.saddr, shdr.saddrlen) == -1){
 		perror("connect");
@@ -303,7 +304,7 @@ pseudo_recv(char *port, uint8_t *buf, ssize_t buflen)
 
 	/* send ack */
 	printf("  -- Sending ack --  \n");
-	if(send_data(dfd, &ackhdr, 0, 0) == -1){
+	if(send_data(dfd, &ack, 0, 0) == -1){
 		fprintf(stderr, "Could not send_ack()\n");
 		close(sfd);
 		close(dfd);
