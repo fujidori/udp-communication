@@ -238,10 +238,10 @@ pseudo_send(char *server, char *port)
 	if (sendlen == -1) {
 		perror("send_data");
 		close(sfd);
+		close(dfd);
 		return 1;
 	}
 	printf("Sent data: %c\n", data);
-	close(sfd);
 
 
 	/* receive and check ack */
@@ -250,13 +250,15 @@ pseudo_send(char *server, char *port)
 		recvlen = recv_data(sfd, &rhdr, rbuf, sizeof(rbuf));
 		if (recvlen == -1){
 			fprintf(stderr, "Could not recv_data()\n");
-			close(dfd);
+			close(sfd);
+			close(sfd);
 			return -1;
 		}
 		printf("Received data: %s\n", rbuf);
 	}while(rhdr.ack_num != shdr.seq_num + shdr.dlen);
 
 
+	close(sfd);
 	close(dfd);
 
 	return sendlen;
@@ -302,6 +304,8 @@ pseudo_recv(char *port, uint8_t *buf, ssize_t buflen)
 	dfd = socket(rhdr.saddr.sa_family, SOCK_DGRAM, 0);
 	if(connect(dfd, &rhdr.saddr, rhdr.saddrlen) == -1){
 		perror("connect");
+		close(sfd);
+		close(dfd);
 		return -1;
 	}
 
@@ -316,5 +320,6 @@ pseudo_recv(char *port, uint8_t *buf, ssize_t buflen)
 
 	close(sfd);
 	close(dfd);
+
 	return recvlen;
 }
