@@ -32,12 +32,12 @@ struct hdr {
 
 static ssize_t send_data(int sockfd, struct hdr *hdr, uint8_t *data, size_t len);
 static ssize_t recv_data(int sockfd, struct hdr *hdr, uint8_t *data, size_t len);
-static int setsock(const char *server, const char *port, struct sockaddr *saddr,
+static int set_socket(const char *server, const char *port, struct sockaddr *saddr,
 		socklen_t *saddrlen, enum action act);
 
 
 static int
-setsock(const char *server, const char *port, struct sockaddr *saddr,
+set_socket(const char *server, const char *port, struct sockaddr *saddr,
 		socklen_t *saddrlen, enum action act)
 {
 	struct addrinfo hints;
@@ -213,8 +213,8 @@ pseudo_send(char *server, char *port)
 	socklen_t saddrlen;
 	socklen_t daddrlen;
 
-	dfd = setsock(server, port, &daddr, &daddrlen, CONNECT);
-	sfd = setsock(NULL, "55555", &saddr, &saddrlen, BIND);
+	dfd = set_socket(server, port, &daddr, &daddrlen, CONNECT);
+	sfd = set_socket(NULL, "55555", &saddr, &saddrlen, BIND);
 
 	/* header */
 	struct hdr shdr;	/* send hdr */
@@ -281,7 +281,7 @@ pseudo_recv(char *port, uint8_t *buf, ssize_t buflen)
 	struct hdr rhdr;	/* receive hdr */
 	struct hdr ack;	/* ack hdr */
 
-	sfd = setsock(NULL, port, &raddr, &rlen, BIND);
+	sfd = set_socket(NULL, port, &raddr, &rlen, BIND);
 
 	printf("-----------------------\n");
 	recvlen = recv_data(sfd, &rhdr, buf, buflen);
