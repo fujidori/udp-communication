@@ -1,19 +1,32 @@
 CC=gcc
 CFLAGS = -O2 -W -Wall -Wextra -Werror -Wmissing-prototypes -Wmissing-declarations
 
+src = $(wildcard *.c)
+obj = $(patsubst %.c, %.o, $(src))
+header = $(wildcard *.h)
+
 .PHONY: all
-all: udp-server udp-client
+all: client server
 
-udp-server: udp-server.o control_socket.o
-	$(CC) $(CFLAGS) -o udp-server udp-server.o control_socket.o
+server: $(obj) example/server.o example/utils.o
+	$(CC) $(CFLAGS) $(obj) example/server.o example/utils.o -o server
 
-udp-client: udp-client.o control_socket.o
-	$(CC) $(CFLAGS) -o udp-client udp-client.o control_socket.o
+client: $(obj) example/client.o example/utils.o
+	$(CC) $(CFLAGS) $(obj) example/client.o example/utils.o -o client
 
-.SUFFIXES: .c .o
-.c.o:
-	$(CC) $(CFLAGS) -c $<
+example/%.o: example/%.c example/%.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.c ${headers}
+	$(CC) $(CFLAGS) -c $< -o $@
+
+debug:
+	make all "CFLAGS=-g3 -O0 -W -Wall -Wextra -Werror -Wmissing-prototypes -Wmissing-declarations -DDEBUG"
+
+# .SUFFIXES: .c .o
+# .c.o:
+# 	$(CC) $(CFLAGS) -c $< -o $@
 
 .PHONY: clean
 clean:
-	rm -f udp-server udp-client *.o 
+	rm -f *.o example/*.o server client
