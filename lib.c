@@ -108,7 +108,12 @@ recv_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
 	struct msghdr msg;
 	memset(&msg,0,sizeof(msg));
 	msg.msg_name = from;
-	msg.msg_namelen = *fromlen;
+
+	if(fromlen != NULL)
+		msg.msg_namelen = *fromlen;
+	else
+		msg.msg_namelen = 0;
+
 	msg.msg_iov = iov;
 	msg.msg_iovlen = sizeof(iov) / sizeof(struct iovec);
 	msg.msg_control = NULL;

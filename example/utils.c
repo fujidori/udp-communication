@@ -14,6 +14,11 @@
 void 
 print_addrinfo(struct sockaddr *addr)
 {
+
+	if (addr == NULL) {
+		return;
+	}
+
 	char addrbuf[INET6_ADDRSTRLEN];
 	switch(addr->sa_family){
 	case AF_INET:
@@ -40,6 +45,7 @@ print_addrinfo(struct sockaddr *addr)
 		break;
 	}
 
+	return;
 }
 
 // int
