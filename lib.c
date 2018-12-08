@@ -70,7 +70,6 @@ send_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
 		return -1;
 	}
 
-
 #ifdef DEBUG
 	/* print sent data*/
 	printf("--------------------\n");
