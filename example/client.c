@@ -108,7 +108,7 @@ main(int argc, char *argv[])
 	/*
 	 * Use lib
 	 */
-	uint8_t data[] = "aaa";
+	uint8_t data[] = "aaaaaaaaaaaaaaaaaaaaaa";
 
 #ifdef DEBUG
 	printf("client\nsend to:\n");

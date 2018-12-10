@@ -19,39 +19,44 @@ struct hdr {
 		fin:1,
 		syn:1,
 		ack:1;
-	size_t dlen;	/* data length */
 } __attribute__((packed));
 
-static ssize_t send_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
+struct pbuf {
+	struct pbuf *next;
+	void *payload;
+	uint16_t len;
+	uint16_t tot_len;
+};
+
+static ssize_t send_pbuf(int s, struct hdr *hdr, struct pbuf *pbuf,
 		struct sockaddr *to, socklen_t tolen);
-static ssize_t recv_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
+static ssize_t recv_pbuf(int s, struct hdr *hdr, struct pbuf *pbuf,
 		struct sockaddr *from, socklen_t *fromlen);
-static void init_hdr(struct hdr *hdr, size_t len);
+static void init_hdr(struct hdr *hdr);
 //static int send_syn();
 //static int send_synack();
 //static int send_ack();
 
 #ifdef DEBUG
 static void
-print_segment(struct hdr *hdr, uint8_t *data)
+print_pbuf(struct hdr *hdr, struct pbuf *pbuf)
 {
 	printf("seq:%u\n", hdr->seq_num); 
 	printf("ack:%u\n", hdr->ack_num);
-	printf("data: %zu bytes\n", hdr->dlen);
+	//printf("data: %zu bytes\n", hdr->dlen);
 	printf("bytes of data: ");
-	for (size_t i = 0; i < hdr->dlen; i++)
-		printf("%" PRIu8 " ", data[i]);
+	for (size_t i = 0; i < pbuf->len; i++)
+		printf("%" PRIu8 " ", ((uint8_t *)(pbuf->payload))[i]);
 	printf("\n");
 	return;
 }
 #endif
 
 static void 
-init_hdr(struct hdr *hdr, size_t len)
+init_hdr(struct hdr *hdr)
 {
 	hdr->seq_num = 0;
 	hdr->ack_num = 0;
-	hdr->dlen = len;
 	hdr->ack = 0;
 	hdr->fin = 0;
 	hdr->syn = 0;
@@ -59,13 +64,11 @@ init_hdr(struct hdr *hdr, size_t len)
 }
 
 static ssize_t
-send_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
+send_pbuf(int s, struct hdr *hdr, struct pbuf *pbuf,
 		struct sockaddr *to, socklen_t tolen)
 {
 	struct iovec iov[2];
 	ssize_t nwrite;
-
-	hdr->dlen = len;
 
 	struct msghdr msg;
 
@@ -77,8 +80,8 @@ send_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
 	msg.msg_controllen = 0;
 	iov[0].iov_base = hdr;
 	iov[0].iov_len = sizeof(struct hdr);
-	iov[1].iov_base = data;
-	iov[1].iov_len = hdr->dlen;
+	iov[1].iov_base = pbuf;
+	iov[1].iov_len = pbuf->len;
 
 	nwrite = sendmsg(s, &msg, 0);
 	if(nwrite == -1) {
@@ -92,17 +95,17 @@ send_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
 	printf("   - Sent data -   \n");
 	printf("to ");
 	print_addrinfo(to);
-	print_segment(hdr, data);
+	print_pbuf(hdr, pbuf);
 	printf("segment size: %zu bytes\n", nwrite);
 	printf("--------------------\n");
 #endif
 
-	return hdr->dlen;
+	return pbuf->len;
 }
 
 
 static ssize_t
-recv_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
+recv_pbuf(int s, struct hdr *hdr, struct pbuf *pbuf,
 		struct sockaddr *from, socklen_t *fromlen)
 {
 	struct iovec iov[2];
@@ -135,8 +138,8 @@ recv_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
 	msg.msg_controllen = 0;
 	iov[0].iov_base = hdr;
 	iov[0].iov_len = sizeof(struct hdr);
-	iov[1].iov_base = data;
-	iov[1].iov_len = len;
+	iov[1].iov_base = pbuf;
+	iov[1].iov_len = pbuf->len;
 
 	nread = recvmsg(s, &msg, 0);
 	if(nread == -1) {
@@ -147,7 +150,7 @@ recv_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
 	printf("recv_data from:\n");
 	print_addrinfo(from);
 
-	data[hdr->dlen] = '\0';
+	//pbuf[hdr->dlen] = '\0';
 
 #ifdef DEBUG
 	/* print received data*/
@@ -155,12 +158,12 @@ recv_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
 	printf("   - Received data -   \n");
 	printf("from ");
 	print_addrinfo((struct sockaddr *)from);
-	print_segment(hdr, data);
+	print_pbuf(hdr, pbuf);
 	printf("segment size: %zu bytes\n", nread);
 	printf("--------------------\n");
 #endif
 
-	return hdr->dlen;
+	return pbuf->len;
 }
 
 
@@ -168,10 +171,14 @@ recv_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
  * Send data, receive ack
  */
 ssize_t
-pseudo_send(int s, uint8_t *buf, size_t len, struct sockaddr *to, socklen_t tolen)
+pseudo_send(int s, void *buf, size_t len, struct sockaddr *to, socklen_t tolen)
 {
-	uint8_t rbuf[BUFSIZE];
+	// uint8_t rbuf[BUFSIZE];
 	ssize_t nread, nwrite;
+	
+	struct pbuf pbuf;
+	pbuf.payload = buf;
+	pbuf.len = len;
 
 	struct sockaddr from;
 	socklen_t fromlen;
@@ -181,12 +188,12 @@ pseudo_send(int s, uint8_t *buf, size_t len, struct sockaddr *to, socklen_t tole
 
 	/* header */
 	struct hdr shdr;	/* send hdr */
-	init_hdr(&shdr, len);
+	init_hdr(&shdr);
 
 	struct hdr rhdr;	/* received hdr */
 
 	/* send data */
-	nwrite = send_data(s, &shdr, buf, len, to, tolen);
+	nwrite = send_pbuf(s, &shdr, &pbuf, to, tolen);
 	if (nwrite == -1) {
 		fprintf(stderr, "Could not send_data()\n");
 		return -1;
@@ -194,13 +201,13 @@ pseudo_send(int s, uint8_t *buf, size_t len, struct sockaddr *to, socklen_t tole
 
 	/* receive and check ack */
 	// do{
-		nread = recv_data(s, &rhdr, rbuf, sizeof(rbuf), &from, &fromlen);
+		nread = recv_pbuf(s, &rhdr, &pbuf, &from, &fromlen);
 		if (nread == -1){
 			fprintf(stderr, "Could not recv_data()\n");
 			return -1;
 		}
 		printf("received ack\n");
-		printf("data: %s\n", rbuf);
+		// printf("data: %s\n", (uint8_t)pbuf.payload);
 	// }while(rhdr.ack_num != shdr.seq_num + shdr.dlen);
 
 	return nwrite;
@@ -211,27 +218,32 @@ pseudo_send(int s, uint8_t *buf, size_t len, struct sockaddr *to, socklen_t tole
  * Receive hdr, send ack
  */
 ssize_t
-pseudo_recv(int s, uint8_t *buf, size_t len, struct sockaddr *from, socklen_t *fromlen)
+pseudo_recv(int s, void *buf, size_t len, struct sockaddr *from, socklen_t *fromlen)
 {
 	struct hdr rhdr;	/* receive hdr */
 	struct hdr ack;	/* ack hdr */
 	ssize_t nread;
+	struct pbuf pbuf;
+	pbuf.len = len;
 
 
-	nread = recv_data(s, &rhdr, buf, len, from, fromlen);
+	nread = recv_pbuf(s, &rhdr, &pbuf, from, fromlen);
 	if (nread == -1){
 		fprintf(stderr, "Could not recv_data()\n");
 		return -1;
 	}
+	memcpy(buf, pbuf.payload, pbuf.len);
+	// buf = pbuf.payload;
 
 	ack.ack = 0;
 	ack.syn = 0;
 	ack.fin = 0;
 	ack.seq_num = rhdr.ack_num;
-	ack.ack_num = rhdr.seq_num + rhdr.dlen;
+	ack.ack_num = rhdr.seq_num + pbuf.len;
 
+	struct pbuf pbuf_empty;
 	/* send ack */
-	if(send_data(s, &ack, 0, 0, from, *fromlen) == -1){
+	if(send_pbuf(s, &ack, &pbuf_empty, from, *fromlen) == -1){
 		fprintf(stderr, "Could not send_ack()\n");
 		return -1;
 	}
