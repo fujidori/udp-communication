@@ -26,6 +26,10 @@ static ssize_t send_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
 		struct sockaddr *to, socklen_t tolen);
 static ssize_t recv_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
 		struct sockaddr *from, socklen_t *fromlen);
+static void init_hdr(struct hdr *hdr, size_t len);
+//static int send_syn();
+//static int send_synack();
+//static int send_ack();
 
 #ifdef DEBUG
 static void
@@ -41,6 +45,18 @@ print_segment(struct hdr *hdr, uint8_t *data)
 	return;
 }
 #endif
+
+static void 
+init_hdr(struct hdr *hdr, size_t len)
+{
+	hdr->seq_num = 0;
+	hdr->ack_num = 0;
+	hdr->dlen = len;
+	hdr->ack = 0;
+	hdr->fin = 0;
+	hdr->syn = 0;
+	return;
+}
 
 static ssize_t
 send_data(int s, struct hdr *hdr, uint8_t *data, size_t len,
@@ -165,12 +181,7 @@ pseudo_send(int s, uint8_t *buf, size_t len, struct sockaddr *to, socklen_t tole
 
 	/* header */
 	struct hdr shdr;	/* send hdr */
-	shdr.seq_num = 0;
-	shdr.ack_num = 0;
-	shdr.dlen = len;
-	shdr.ack = 1;
-	shdr.fin = 0;
-	shdr.syn = 0;
+	init_hdr(&shdr, len);
 
 	struct hdr rhdr;	/* received hdr */
 
