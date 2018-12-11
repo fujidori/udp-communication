@@ -6,13 +6,19 @@ obj = $(patsubst %.c, %.o, $(src))
 header = $(wildcard *.h)
 
 .PHONY: all
-all: client server
+all: client server ft-server ft-client
 
 server: $(obj) example/server.o example/utils.o
 	$(CC) $(CFLAGS) $(obj) example/server.o example/utils.o -o server
 
 client: $(obj) example/client.o example/utils.o
 	$(CC) $(CFLAGS) $(obj) example/client.o example/utils.o -o client
+
+ft-server: $(obj) example/ft-server.o example/utils.o
+	$(CC) $(CFLAGS) $(obj) example/ft-server.o example/utils.o -o ft-server
+
+ft-client: $(obj) example/ft-client.o example/utils.o
+	$(CC) $(CFLAGS) $(obj) example/ft-client.o example/utils.o -o ft-client
 
 example/%.o: example/%.c example/%.h
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -29,4 +35,4 @@ debug:
 
 .PHONY: clean
 clean:
-	rm -f *.o example/*.o server client
+	rm -f *.o example/*.o server client ft-server ft-client
