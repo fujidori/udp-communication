@@ -134,12 +134,11 @@ main(int argc, char *argv[])
 		if(c == EOF)
 			break;
 
-		ringbuf_push(rbuf, c);
-
 #ifdef DEBUG
 		printf("%c\n", c);
 #endif
 
+		ringbuf_push(rbuf, c);
 		ringbuf_pop(rbuf, (uint8_t*)&c);
 
 		if(fputc(c, fp) == EOF)

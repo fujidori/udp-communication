@@ -130,12 +130,12 @@ main(int argc, char *argv[])
 
 	while (1) {
 		char c = fgetc(fp);
-		ringbuf_push(sbuf, c);
 
 #ifdef DEBUG
 		printf("%c\n", c);
 #endif
 
+		ringbuf_push(sbuf, c);
 		ringbuf_pop(sbuf, (uint8_t*)&c);
 		sendto(s, &c, sizeof(c), 0, &to, tolen);
 
