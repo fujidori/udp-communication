@@ -14,8 +14,11 @@
 #include "utils.h"
 //#include "../lib.h"
 #include "../ringbuf.h"
+#include "../rtt.h"
 
-#define BUFSIZE 1460
+#define BUFSIZE (64 * 1024)
+#define MAXLINE 1000
+#define MSS 1460
 
 int
 main(int argc, char *argv[])
@@ -119,25 +122,49 @@ main(int argc, char *argv[])
 	 */
 	uint8_t buf[BUFSIZE];
 	struct ringbuf_t *sbuf = ringbuf_init(buf, BUFSIZE);
+	ssize_t nread, n;
 
 	FILE *fp;
 	fp = fopen(filename, "r");
 	if (fp == NULL) {
 		perror("fopen");
+		close(s);
 		fclose(fp);
 		exit(EXIT_FAILURE);
 	}
+//aaaaaaaaaa
+	char	sendline[MAXLINE], recvline[MAXLINE + 1];
+
+//aaaaaaaaaa
 
 	while (1) {
-		char c = fgetc(fp);
+		/* char c = fgetc(fp); */
 
 #ifdef DEBUG
-		printf("%c\n", c);
+		/* printf("%c\n", c); */
 #endif
 
-		ringbuf_push(sbuf, c);
-		ringbuf_pop(sbuf, (uint8_t*)&c);
-		sendto(s, &c, sizeof(c), 0, &to, tolen);
+		n = fread(sendline, MAXLINE, 1, fp);
+		// if(fgets(sendline, MAXLINE, fp) == NULL){
+		// 	perror("fopen");
+		// 	close(s);
+		// 	fclose(fp);
+		// 	exit(EXIT_FAILURE);
+		// }
+
+		nread = dg_send_recv(s, sendline, strlen(sendline),
+						recvline, MAXLINE, &to, tolen);
+		if (n  == -1){
+			fprintf(stderr, "dg_send_recv\n");
+			close(s);
+			fclose(fp);
+			exit(EXIT_FAILURE);
+		}
+
+		/* ringbuf_push(sbuf, c);           */
+		/* ringbuf_pop(sbuf, (uint8_t*)&c); */
+
+		/* sendto(s, &c, sizeof(c), 0, &to, tolen); */
 
 		if(feof(fp)) {
 			break;

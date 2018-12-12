@@ -1,4 +1,4 @@
-# uda-communication
+# udp-communication
 ```
 make debug
 ./ft-client -f <sendfile> -h 127.0.0.1

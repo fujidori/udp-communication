@@ -13,7 +13,9 @@
 //#include "../lib.h"
 #include "../ringbuf.h"
 
-#define BUFSIZE 1460
+#define BUFSIZE (64 * 1024)
+#define MAXLINE 1000
+#define MSS 1460
 
 int
 main(int argc, char *argv[])
@@ -107,11 +109,12 @@ main(int argc, char *argv[])
 	 * File Transfer
 	 */
 	uint8_t buf[BUFSIZE];
-	ssize_t nread;
+	struct ringbuf_t *rbuf = ringbuf_init(buf, BUFSIZE);
+	ssize_t nread, nwrite;
 	struct sockaddr from;
 	socklen_t fromlen;
 
-	struct ringbuf_t *rbuf = ringbuf_init(buf, BUFSIZE);
+	char msg[MAXLINE];
 
 	FILE *fp;
 	fp = fopen(filename, "w");
@@ -123,26 +126,37 @@ main(int argc, char *argv[])
 	}
 
 	while (1) {
-		char c;
-		nread = recvfrom(s, &c, sizeof(c), 0, &from, &fromlen);
+		nread = recvfrom(s, &msg, MAXLINE, 0, &from, &fromlen);
 		if (nread == -1){
 			perror("recvfrom");
 			close(s);
 			fclose(fp);
 			exit(EXIT_FAILURE);
 		}
-		if(c == EOF)
-			break;
+		// if(c == EOF)
+		// 	break;
+
+		nwrite = sendto(s, msg, nread, 0, &from, fromlen);
+		if (nwrite == -1){
+			perror("sendto");
+			close(s);
+			fclose(fp);
+			exit(EXIT_FAILURE);
+		}
 
 #ifdef DEBUG
-		printf("%c\n", c);
+		// printf("%c\n", c);
 #endif
 
-		ringbuf_push(rbuf, c);
-		ringbuf_pop(rbuf, (uint8_t*)&c);
+		// ringbuf_push(rbuf, c);
+		// ringbuf_pop(rbuf, (uint8_t*)&c);
 
-		if(fputc(c, fp) == EOF)
-			break;
+		fwrite(msg, nwrite, 1, fp);
+		// for (int i = 0; i < nread; i++) {
+		// 	if(fputc(msg[i], fp) == EOF)
+		// 		break;
+		// }
+
 	}
 
 	close(s);
