@@ -15,6 +15,7 @@
 //#include "../lib.h"
 #include "../ringbuf.h"
 #include "../rtt.h"
+#include "../dg_send_recv.h"
 
 #define BUFSIZE (64 * 1024)
 #define MAXLINE 1000
@@ -122,7 +123,7 @@ main(int argc, char *argv[])
 	 */
 	uint8_t buf[BUFSIZE];
 	struct ringbuf_t *sbuf = ringbuf_init(buf, BUFSIZE);
-	ssize_t nread, n;
+	ssize_t nread;
 
 	FILE *fp;
 	fp = fopen(filename, "r");
@@ -144,7 +145,14 @@ main(int argc, char *argv[])
 		/* printf("%c\n", c); */
 #endif
 
-		n = fread(sendline, MAXLINE, 1, fp);
+		// n = fread(sendline, MAXLINE, 1, fp);
+		fread(sendline, MAXLINE, 1, fp);
+		if (ferror(fp) == -1){
+			fprintf(stderr, "dg_send_recv\n");
+			close(s);
+			fclose(fp);
+			exit(EXIT_FAILURE);
+		}
 		// if(fgets(sendline, MAXLINE, fp) == NULL){
 		// 	perror("fopen");
 		// 	close(s);
@@ -154,15 +162,16 @@ main(int argc, char *argv[])
 
 		nread = dg_send_recv(s, sendline, strlen(sendline),
 						recvline, MAXLINE, &to, tolen);
-		if (n  == -1){
+		if (nread  == -1){
 			fprintf(stderr, "dg_send_recv\n");
 			close(s);
 			fclose(fp);
 			exit(EXIT_FAILURE);
 		}
 
-		/* ringbuf_push(sbuf, c);           */
-		/* ringbuf_pop(sbuf, (uint8_t*)&c); */
+		char c = 'a';
+		ringbuf_push(sbuf, c);
+		ringbuf_pop(sbuf, (uint8_t*)&c);
 
 		/* sendto(s, &c, sizeof(c), 0, &to, tolen); */
 

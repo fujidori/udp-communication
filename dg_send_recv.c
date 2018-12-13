@@ -98,7 +98,7 @@ sendagain:
 }
 
 static void
-sig_alrm(int signo)
+sig_alrm(int signo __attribute__((unused)))
 {
 	siglongjmp(jmpbuf, 1);
 }

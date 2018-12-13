@@ -126,7 +126,7 @@ main(int argc, char *argv[])
 	}
 
 	while (1) {
-		nread = recvfrom(s, &msg, MAXLINE, 0, &from, &fromlen);
+		nread = recvfrom(s, msg, MAXLINE, 0, &from, &fromlen);
 		if (nread == -1){
 			perror("recvfrom");
 			close(s);
@@ -148,8 +148,9 @@ main(int argc, char *argv[])
 		// printf("%c\n", c);
 #endif
 
-		// ringbuf_push(rbuf, c);
-		// ringbuf_pop(rbuf, (uint8_t*)&c);
+		char c = 'a';
+		ringbuf_push(rbuf, c);
+		ringbuf_pop(rbuf, (uint8_t*)&c);
 
 		fwrite(msg, nwrite, 1, fp);
 		// for (int i = 0; i < nread; i++) {
