@@ -137,7 +137,6 @@ main(int argc, char *argv[])
 	struct iovec iovsend[2], iovrecv[2];
 
 	while (1) {
-
 		msgrecv.msg_name = &from;
 		msgrecv.msg_namelen = fromlen;
 		msgrecv.msg_iov = iovrecv;
@@ -183,15 +182,23 @@ main(int argc, char *argv[])
 		printf("\n");
 #endif
 
-		char c = 'a';
-		ringbuf_push(rbuf, c);
-		ringbuf_pop(rbuf, (uint8_t*)&c);
+		for (int i = 0; i < nread - (ssize_t)sizeof(struct hdr); i++) {
+			ringbuf_push(rbuf, msg[i]);
+			ringbuf_pop(rbuf, (uint8_t*)&msg[i]);
+		}
 
-		fwrite(msg, nread, 1, fp);
+		int r;
+		r = fwrite(msg, nread, 1, fp);
+		if (ferror(fp) == -1){
+			fprintf(stderr, "fwrite\n");
+			close(s);
+			fclose(fp);
+			exit(EXIT_FAILURE);
+		}
 
-#ifdef DEBUG
-		// printf("%c\n", c);
-#endif
+		if (r) {
+			break;
+		}
 
 		// if(c == EOF)
 		// 	break;

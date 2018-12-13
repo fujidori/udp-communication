@@ -121,13 +121,9 @@ main(int argc, char *argv[])
 	/*
 	 * File Transfer
 	 */
-	// uint8_t buf[BUFSIZE];
-	// struct ringbuf_t *sbuf = ringbuf_init(buf, BUFSIZE);
 	ssize_t nread;
-
 	FILE *fp;
-	fp = fopen(filename, "r");
-	if (fp == NULL) {
+	if((fp = fopen(filename, "r")) == NULL){
 		perror("fopen");
 		close(s);
 		fclose(fp);
@@ -137,13 +133,6 @@ main(int argc, char *argv[])
 	char sendline[MAXLINE], recvline[MAXLINE + 1];
 
 	while (1) {
-		/* char c = fgetc(fp); */
-
-#ifdef DEBUG
-		/* printf("%c\n", c); */
-#endif
-
-		// n = fread(sendline, MAXLINE, 1, fp);
 		fread(sendline, MAXLINE, 1, fp);
 		if (ferror(fp) == -1){
 			fprintf(stderr, "dg_send_recv\n");
@@ -151,28 +140,15 @@ main(int argc, char *argv[])
 			fclose(fp);
 			exit(EXIT_FAILURE);
 		}
-		// if(fgets(sendline, MAXLINE, fp) == NULL){
-		// 	perror("fopen");
-		// 	close(s);
-		// 	fclose(fp);
-		// 	exit(EXIT_FAILURE);
-		// }
 
 		nread = dg_send_recv(s, sendline, strlen(sendline),
 						recvline, MAXLINE, &to, tolen);
-		// printf("sendlen: %zu\n", strlen(sendline));
 		if (nread  == -1){
 			fprintf(stderr, "dg_send_recv\n");
 			close(s);
 			fclose(fp);
 			exit(EXIT_FAILURE);
 		}
-
-		// char c = 'a';
-		// ringbuf_push(sbuf, c);
-		// ringbuf_pop(sbuf, (uint8_t*)&c);
-
-		/* sendto(s, &c, sizeof(c), 0, &to, tolen); */
 
 		if(feof(fp)) {
 			break;
