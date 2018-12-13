@@ -17,6 +17,12 @@
 #define MAXLINE 1000
 #define MSS 1460
 
+static struct hdr {
+  uint32_t	seq;	/* sequence # */
+  uint32_t	ts;		/* timestamp when sent */
+} recvhdr;
+/* } sendhdr, recvhdr; */
+
 int
 main(int argc, char *argv[])
 {
@@ -112,7 +118,7 @@ main(int argc, char *argv[])
 	struct ringbuf_t *rbuf = ringbuf_init(buf, BUFSIZE);
 	ssize_t nread, nwrite;
 	struct sockaddr from;
-	socklen_t fromlen;
+	socklen_t fromlen = sizeof(struct sockaddr);
 
 	char msg[MAXLINE];
 
@@ -125,34 +131,71 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	struct msghdr msgsend, msgrecv;
+	memset(&msgsend, 0, sizeof(msgsend));
+	memset(&msgrecv, 0, sizeof(msgrecv));
+	struct iovec iovsend[2], iovrecv[2];
+
 	while (1) {
-		nread = recvfrom(s, msg, MAXLINE, 0, &from, &fromlen);
+
+		msgrecv.msg_name = &from;
+		msgrecv.msg_namelen = fromlen;
+		msgrecv.msg_iov = iovrecv;
+		msgrecv.msg_iovlen = 2;
+		iovrecv[0].iov_base = &recvhdr;
+		iovrecv[0].iov_len = sizeof(struct hdr);
+		iovrecv[1].iov_base = msg;
+		iovrecv[1].iov_len = MAXLINE;
+
+		nread = recvmsg(s, &msgrecv, 0);
 		if (nread == -1){
-			perror("recvfrom");
+			perror("recvmsg");
 			close(s);
 			fclose(fp);
 			exit(EXIT_FAILURE);
 		}
-		// if(c == EOF)
-		// 	break;
 
-		nwrite = sendto(s, msg, nread, 0, &from, fromlen);
+		msgsend.msg_name = &from;
+		msgsend.msg_namelen = fromlen;
+		msgsend.msg_iov = iovsend;
+		msgsend.msg_iovlen = 2;
+		iovsend[0].iov_base = &recvhdr;
+		iovsend[0].iov_len = sizeof(struct hdr);
+		iovsend[1].iov_base = msg;
+		iovsend[1].iov_len = nread - sizeof(struct hdr);
+
+		nwrite = sendmsg(s, &msgsend, 0);
 		if (nwrite == -1){
-			perror("sendto");
+			perror("sendmsg");
 			close(s);
 			fclose(fp);
 			exit(EXIT_FAILURE);
 		}
 
 #ifdef DEBUG
-		// printf("%c\n", c);
+		printf(" --- remote address --- \n");
+		print_addrinfo(&from);
+		printf(" --- received massage --- \n");
+		printf("msg:%s\nmsglen:%zu\n", msg, sizeof(msg));
+		printf(" --- read & write bytes --- \n");
+		printf("nread:%zd\n", nread);
+		printf("nwrite:%zd\n", nwrite);
+		printf("\n");
 #endif
 
 		char c = 'a';
 		ringbuf_push(rbuf, c);
 		ringbuf_pop(rbuf, (uint8_t*)&c);
 
-		fwrite(msg, nwrite, 1, fp);
+		fwrite(msg, nread, 1, fp);
+
+#ifdef DEBUG
+		// printf("%c\n", c);
+#endif
+
+		// if(c == EOF)
+		// 	break;
+
 		// for (int i = 0; i < nread; i++) {
 		// 	if(fputc(msg[i], fp) == EOF)
 		// 		break;

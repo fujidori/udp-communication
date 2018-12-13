@@ -121,8 +121,8 @@ main(int argc, char *argv[])
 	/*
 	 * File Transfer
 	 */
-	uint8_t buf[BUFSIZE];
-	struct ringbuf_t *sbuf = ringbuf_init(buf, BUFSIZE);
+	// uint8_t buf[BUFSIZE];
+	// struct ringbuf_t *sbuf = ringbuf_init(buf, BUFSIZE);
 	ssize_t nread;
 
 	FILE *fp;
@@ -133,10 +133,8 @@ main(int argc, char *argv[])
 		fclose(fp);
 		exit(EXIT_FAILURE);
 	}
-//aaaaaaaaaa
-	char	sendline[MAXLINE], recvline[MAXLINE + 1];
 
-//aaaaaaaaaa
+	char sendline[MAXLINE], recvline[MAXLINE + 1];
 
 	while (1) {
 		/* char c = fgetc(fp); */
@@ -162,6 +160,7 @@ main(int argc, char *argv[])
 
 		nread = dg_send_recv(s, sendline, strlen(sendline),
 						recvline, MAXLINE, &to, tolen);
+		// printf("sendlen: %zu\n", strlen(sendline));
 		if (nread  == -1){
 			fprintf(stderr, "dg_send_recv\n");
 			close(s);
@@ -169,9 +168,9 @@ main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		char c = 'a';
-		ringbuf_push(sbuf, c);
-		ringbuf_pop(sbuf, (uint8_t*)&c);
+		// char c = 'a';
+		// ringbuf_push(sbuf, c);
+		// ringbuf_pop(sbuf, (uint8_t*)&c);
 
 		/* sendto(s, &c, sizeof(c), 0, &to, tolen); */
 
