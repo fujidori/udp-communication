@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include "utils.h"
+#include "../utils.h"
 #include "../lib.h"
 
 int
