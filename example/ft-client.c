@@ -19,7 +19,7 @@
 
 #define BUFSIZE (64 * 1024)
 #define MAXLINE 1000
-#define MSS 1460
+#define MSS 1400
 
 int
 main(int argc, char *argv[])
@@ -130,10 +130,10 @@ main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	char sendline[MAXLINE], recvline[MAXLINE + 1];
+	char sbuf[MSS], rbuf[MSS + 1];
 
 	while (1) {
-		fread(sendline, MAXLINE, 1, fp);
+		fread(sbuf, MAXLINE, 1, fp);
 		if (ferror(fp) == -1){
 			fprintf(stderr, "dg_send_recv\n");
 			close(s);
@@ -141,14 +141,19 @@ main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 
-		nread = dg_send_recv(s, sendline, strlen(sendline),
-						recvline, MAXLINE, &to, tolen);
+		nread = dg_send_recv(s, sbuf, strlen(sbuf),
+						rbuf, MAXLINE, &to, tolen);
 		if (nread  == -1){
 			fprintf(stderr, "dg_send_recv\n");
 			close(s);
 			fclose(fp);
 			exit(EXIT_FAILURE);
 		}
+
+#ifdef DEBUG
+		printf("strlen(sbuf): %zu\n", strlen(sbuf));
+		printf("nread: %zu\n\n", nread);
+#endif
 
 		if(feof(fp)) {
 			break;
