@@ -100,7 +100,7 @@ main(int argc, char *argv[])
 	uint8_t buf[BUFSIZE];
 	ssize_t nread;
 	struct sockaddr from;
-	socklen_t fromlen;
+	socklen_t fromlen = sizeof(struct sockaddr);
 
 #ifdef DEBUG
 	struct sockaddr local;

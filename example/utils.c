@@ -22,8 +22,8 @@ print_addrinfo(struct sockaddr *addr)
 	char addrbuf[INET6_ADDRSTRLEN];
 	switch(addr->sa_family){
 	case AF_INET:
-		printf("\tAF_INET\n");
-		printf("\t%s:%d\n", 
+		printf("AF_INET\n");
+		printf("%s:%d\n", 
 				inet_ntop(addr->sa_family, 
 					&((struct sockaddr_in *)addr)->sin_addr,
 					addrbuf, sizeof(addrbuf)),
@@ -31,7 +31,7 @@ print_addrinfo(struct sockaddr *addr)
 		break;
 	case AF_INET6:
 		printf("AF_INET6\n");
-		printf("\t%s:%d\n", 
+		printf("%s:%d\n", 
 				inet_ntop(addr->sa_family, 
 					&((struct sockaddr_in6 *)addr)->sin6_addr,
 					addrbuf, sizeof(addrbuf)),
