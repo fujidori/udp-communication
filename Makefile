@@ -8,17 +8,17 @@ header = $(wildcard *.h)
 .PHONY: all
 all: client server ft-server ft-client
 
-server: $(obj) example/server.o example/utils.o
-	$(CC) $(CFLAGS) $(obj) example/server.o example/utils.o -o server
+server: $(obj) example/server.o
+	$(CC) $(CFLAGS) $(obj) example/server.o -o server
 
-client: $(obj) example/client.o example/utils.o
-	$(CC) $(CFLAGS) $(obj) example/client.o example/utils.o -o client
+client: $(obj) example/client.o
+	$(CC) $(CFLAGS) $(obj) example/client.o -o client
 
-ft-server: $(obj) example/ft-server.o example/utils.o
-	$(CC) $(CFLAGS) $(obj) example/ft-server.o example/utils.o -o ft-server
+ft-server: $(obj) example/ft-server.o
+	$(CC) $(CFLAGS) $(obj) example/ft-server.o -o ft-server
 
-ft-client: $(obj) example/ft-client.o example/utils.o
-	$(CC) $(CFLAGS) $(obj) example/ft-client.o example/utils.o -o ft-client
+ft-client: $(obj) example/ft-client.o
+	$(CC) $(CFLAGS) $(obj) example/ft-client.o -o ft-client
 
 example/%.o: example/%.c example/%.h
 	$(CC) $(CFLAGS) -c $< -o $@

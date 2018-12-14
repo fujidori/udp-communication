@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <inttypes.h>
 #include "lib.h"
-#include "example/utils.h"
+#include "utils.h"
 
 struct hdr {
 	uint32_t seq_num;	/* sequence number */

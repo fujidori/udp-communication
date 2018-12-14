@@ -18,7 +18,6 @@
 #include "../dg_send_recv.h"
 
 #define BUFSIZE (64 * 1024)
-#define MAXLINE 1000
 #define MSS 1400
 
 int
@@ -133,7 +132,7 @@ main(int argc, char *argv[])
 	char sbuf[MSS], rbuf[MSS + 1];
 
 	while (1) {
-		fread(sbuf, MAXLINE, 1, fp);
+		fread(sbuf, MSS, 1, fp);
 		if (ferror(fp) == -1){
 			fprintf(stderr, "dg_send_recv\n");
 			close(s);
@@ -142,7 +141,7 @@ main(int argc, char *argv[])
 		}
 
 		nread = dg_send_recv(s, sbuf, strlen(sbuf),
-						rbuf, MAXLINE, &to, tolen);
+						rbuf, MSS, &to, tolen);
 		if (nread  == -1){
 			fprintf(stderr, "dg_send_recv\n");
 			close(s);

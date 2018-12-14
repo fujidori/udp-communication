@@ -14,8 +14,7 @@
 #include "../ringbuf.h"
 
 #define BUFSIZE (64 * 1024)
-#define MAXLINE 1000
-#define MSS 1460
+#define MSS 1400
 
 static struct hdr {
   uint32_t	seq;	/* sequence # */
@@ -120,7 +119,7 @@ main(int argc, char *argv[])
 	struct sockaddr from;
 	socklen_t fromlen = sizeof(struct sockaddr);
 
-	char msg[MAXLINE];
+	char msg[MSS];
 
 	FILE *fp;
 	fp = fopen(filename, "w");
@@ -144,7 +143,7 @@ main(int argc, char *argv[])
 		iovrecv[0].iov_base = &recvhdr;
 		iovrecv[0].iov_len = sizeof(struct hdr);
 		iovrecv[1].iov_base = msg;
-		iovrecv[1].iov_len = MAXLINE;
+		iovrecv[1].iov_len = MSS;
 
 		nread = recvmsg(s, &msgrecv, 0);
 		if (nread == -1){
